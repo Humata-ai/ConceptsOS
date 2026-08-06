@@ -12,6 +12,10 @@ metadata:
     role: node
 spec:
   replicas: 1
+  strategy:
+    # Only one pod can hold /dev/net/tun on a single-node cluster; recreate
+    # instead of rolling to avoid the new pod stuck Pending on the old.
+    type: Recreate
   selector:
     matchLabels:
       app: conceptsos-node
