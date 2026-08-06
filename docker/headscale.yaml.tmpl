@@ -34,7 +34,7 @@ derp:
     region_code: "conceptsos"
     region_name: "ConceptsOS embedded DERP"
     stun_listen_addr: "0.0.0.0:3478"
-    private_key_path: ${HS_STATE:-/var/lib/conceptsos-vpn/headscale}/derp_server_private.key
+    private_key_path: ${HEADSCALE_DERP_KEY}
   urls: []
   paths: []
   auto_update_enabled: false
@@ -52,10 +52,16 @@ log:
   level: info
 
 dns:
-  magic_dns: false
-  base_domain: conceptsos.internal
+  magic_dns: true
+  # Suffix appended to each machine's hostname. MUST be different from the
+  # headscale server_url domain so the two DNS scopes don't collide.
+  # Machines end up reachable as <hostname>.${HEADSCALE_BASE_DOMAIN} from
+  # inside the tailnet only — the domain has no public A records.
+  base_domain: ${HEADSCALE_BASE_DOMAIN}
   nameservers:
-    global: []
+    global:
+      - 1.1.1.1
+      - 8.8.8.8
 
 policy:
   mode: file

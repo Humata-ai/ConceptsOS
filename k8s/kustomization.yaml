@@ -22,4 +22,4 @@ configMapGenerator:
 images:
   - name: conceptsos-vpn
     newName: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/vpn
-    newTag: v2
+    newTag: v3

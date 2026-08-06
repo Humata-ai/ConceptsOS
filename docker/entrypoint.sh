@@ -38,6 +38,7 @@ export HEADSCALE_METRICS_ADDR="${HEADSCALE_METRICS_ADDR:-127.0.0.1:9090}"
 export HEADSCALE_DB_PATH="${HEADSCALE_DB_PATH:-$HS_STATE/db.sqlite}"
 export HEADSCALE_NOISE_KEY="${HEADSCALE_NOISE_KEY:-$HS_STATE/noise_private.key}"
 export HEADSCALE_PRIVATE_KEY="${HEADSCALE_PRIVATE_KEY:-$HS_STATE/private.key}"
+export HEADSCALE_DERP_KEY="${HEADSCALE_DERP_KEY:-$HS_STATE/derp_server_private.key}"
 
 # TLS knobs. Default to plain HTTP on :8080 (backwards compatible with the
 # initial demo setup). If HEADSCALE_TLS_LETSENCRYPT_HOSTNAME is set, we flip
@@ -48,6 +49,7 @@ export HEADSCALE_TLS_CHALLENGE_TYPE="${HEADSCALE_TLS_CHALLENGE_TYPE:-HTTP-01}"
 export HEADSCALE_TLS_CERT_PATH="${HEADSCALE_TLS_CERT_PATH:-}"
 export HEADSCALE_TLS_KEY_PATH="${HEADSCALE_TLS_KEY_PATH:-}"
 export HEADSCALE_ACME_HTTP_PORT="${HEADSCALE_ACME_HTTP_PORT:-80}"
+export HEADSCALE_BASE_DOMAIN="${HEADSCALE_BASE_DOMAIN:-ts.local}"
 
 if [[ -n "$HEADSCALE_TLS_LETSENCRYPT_HOSTNAME" || -n "$HEADSCALE_TLS_CERT_PATH" ]]; then
   export HEADSCALE_LISTEN_ADDR="${HEADSCALE_LISTEN_ADDR:-0.0.0.0:443}"
@@ -130,11 +132,12 @@ done
 
 # --- 5. tailscale up (join our own tailnet) --------------------------------
 log "joining self tailnet as '$TS_HOSTNAME' via $SELF_LOGIN_URL…"
+# Accept MagicDNS from headscale so peers are reachable by name.
 tailscale up \
   --login-server="$SELF_LOGIN_URL" \
   --authkey="$SELF_AUTHKEY" \
   --hostname="$TS_HOSTNAME" \
-  --accept-dns=false \
+  --accept-dns=true \
   --reset
 
 # --- 6. Discover our tailnet IP and start Next.js bound to it --------------
