@@ -1,0 +1,66 @@
+# One customer's app pod. Runs tailscaled + Next.js and joins the shared
+# control plane at HEADSCALE_SERVER_URL using a preauth key issued at
+# signup time. The Next.js app binds to the tailnet IP only — no Service,
+# no public port. The only way to reach it is to be a peer on the same
+# tailnet (which is scoped by headscale ACLs to just this customer).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: conceptsos-node
+  labels:
+    app: conceptsos-node
+    role: node
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: conceptsos-node
+  template:
+    metadata:
+      labels:
+        app: conceptsos-node
+        role: node
+    spec:
+      containers:
+        - name: node
+          image: conceptsos-vpn:latest
+          imagePullPolicy: Always
+          env:
+            - name: VPN_MODE
+              value: "node"
+            # TS_AUTHKEY is customer-specific and comes from a Secret the
+            # signup service creates. HEADSCALE_SERVER_URL + TS_HOSTNAME
+            # come from the ConfigMap.
+            - name: TS_AUTHKEY
+              valueFrom:
+                secretKeyRef:
+                  name: conceptsos-node-secret
+                  key: TS_AUTHKEY
+          envFrom:
+            - configMapRef:
+                name: conceptsos-node-config
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN", "NET_RAW"]
+          volumeMounts:
+            - name: dev-net-tun
+              mountPath: /dev/net/tun
+            - name: state
+              mountPath: /var/lib/conceptsos-vpn
+          # No httpGet probe: Next.js is bound to the tailnet IP and there
+          # is no eth0 listener to probe. An exec probe against
+          # `tailscale status` would work if we needed one.
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+      volumes:
+        - name: dev-net-tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice
+        - name: state
+          emptyDir: {}

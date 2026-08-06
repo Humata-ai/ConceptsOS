@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# One customer's app pod, joining the shared control plane at
+# https://hs.conceptsos.com under headscale user "dans-computer".
+#
+# Deploy with:  kubectl apply -k k8s/overlays/customers/dans-computer/
+
+namespace: cust-dans-computer
+
+resources:
+  - namespace.yaml
+  - ../../../base/node
+
+configMapGenerator:
+  - name: conceptsos-node-config
+    envs:
+      - config.env
+
+# In real signup this Secret is created by the signup service after
+# calling `headscale preauthkeys create -u <customer>`. Committing a
+# placeholder key here is fine for the demo — regenerate before deploy.
+secretGenerator:
+  - name: conceptsos-node-secret
+    envs:
+      - secret.env
+
+images:
+  - name: conceptsos-vpn
+    newName: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/vpn
+    newTag: v4
