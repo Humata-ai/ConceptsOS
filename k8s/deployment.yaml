@@ -17,13 +17,31 @@ spec:
       containers:
         - name: conceptsos
           image: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/app:latest
-          # Dockerfile's default CMD is `bash`, which exits immediately in k8s
-          # (no TTY). Override with a sleep so the pod stays running.
-          command: ["sleep", "infinity"]
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
           resources:
             requests:
               cpu: "50m"
-              memory: "64Mi"
+              memory: "128Mi"
             limits:
-              cpu: "250m"
-              memory: "256Mi"
+              cpu: "500m"
+              memory: "512Mi"
