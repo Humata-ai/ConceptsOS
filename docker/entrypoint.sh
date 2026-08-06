@@ -34,11 +34,29 @@ chmod 0700 "$HS_STATE" "$TS_STATE" || true
 
 # --- Config knobs (with sensible defaults for the all-in-one case) ---------
 export HEADSCALE_SERVER_URL="${HEADSCALE_SERVER_URL:-http://127.0.0.1:8080}"
-export HEADSCALE_LISTEN_ADDR="${HEADSCALE_LISTEN_ADDR:-0.0.0.0:8080}"
 export HEADSCALE_METRICS_ADDR="${HEADSCALE_METRICS_ADDR:-127.0.0.1:9090}"
 export HEADSCALE_DB_PATH="${HEADSCALE_DB_PATH:-$HS_STATE/db.sqlite}"
 export HEADSCALE_NOISE_KEY="${HEADSCALE_NOISE_KEY:-$HS_STATE/noise_private.key}"
 export HEADSCALE_PRIVATE_KEY="${HEADSCALE_PRIVATE_KEY:-$HS_STATE/private.key}"
+
+# TLS knobs. Default to plain HTTP on :8080 (backwards compatible with the
+# initial demo setup). If HEADSCALE_TLS_LETSENCRYPT_HOSTNAME is set, we flip
+# to HTTPS on :443 and headscale runs ACME HTTP-01 itself.
+export HEADSCALE_TLS_LETSENCRYPT_HOSTNAME="${HEADSCALE_TLS_LETSENCRYPT_HOSTNAME:-}"
+export HEADSCALE_TLS_CACHE_DIR="${HEADSCALE_TLS_CACHE_DIR:-$HS_STATE/cache}"
+export HEADSCALE_TLS_CHALLENGE_TYPE="${HEADSCALE_TLS_CHALLENGE_TYPE:-HTTP-01}"
+export HEADSCALE_TLS_CERT_PATH="${HEADSCALE_TLS_CERT_PATH:-}"
+export HEADSCALE_TLS_KEY_PATH="${HEADSCALE_TLS_KEY_PATH:-}"
+export HEADSCALE_ACME_HTTP_PORT="${HEADSCALE_ACME_HTTP_PORT:-80}"
+
+if [[ -n "$HEADSCALE_TLS_LETSENCRYPT_HOSTNAME" || -n "$HEADSCALE_TLS_CERT_PATH" ]]; then
+  export HEADSCALE_LISTEN_ADDR="${HEADSCALE_LISTEN_ADDR:-0.0.0.0:443}"
+  SELF_LOGIN_URL="$HEADSCALE_SERVER_URL"
+else
+  export HEADSCALE_LISTEN_ADDR="${HEADSCALE_LISTEN_ADDR:-0.0.0.0:8080}"
+  SELF_LOGIN_URL="http://127.0.0.1:8080"
+fi
+mkdir -p "$HEADSCALE_TLS_CACHE_DIR"
 
 TS_HOSTNAME="${TS_HOSTNAME:-$(hostname)}"
 TS_USER="${TS_USER:-default}"
@@ -54,10 +72,14 @@ log "starting headscale…"
 headscale -c /etc/conceptsos-vpn/headscale.yaml serve &
 HS_PID=$!
 
-# Wait for /health
-for i in $(seq 1 60); do
-  if curl -fsS -m 1 "http://127.0.0.1:8080/health" >/dev/null 2>&1; then
-    log "headscale healthy after ${i}s"
+# Wait for /health. Try HTTPS first (TLS mode), then HTTP fallback.
+HEALTH_URL="http://127.0.0.1:8080/health"
+if [[ -n "$HEADSCALE_TLS_LETSENCRYPT_HOSTNAME" || -n "$HEADSCALE_TLS_CERT_PATH" ]]; then
+  HEALTH_URL="https://127.0.0.1/health"
+fi
+for i in $(seq 1 120); do
+  if curl -fsS -k -m 2 "$HEALTH_URL" >/dev/null 2>&1; then
+    log "headscale healthy after ${i}s ($HEALTH_URL)"
     break
   fi
   if ! kill -0 "$HS_PID" 2>/dev/null; then
@@ -107,9 +129,9 @@ for i in $(seq 1 30); do
 done
 
 # --- 5. tailscale up (join our own tailnet) --------------------------------
-log "joining self tailnet as '$TS_HOSTNAME'…"
+log "joining self tailnet as '$TS_HOSTNAME' via $SELF_LOGIN_URL…"
 tailscale up \
-  --login-server="http://127.0.0.1:8080" \
+  --login-server="$SELF_LOGIN_URL" \
   --authkey="$SELF_AUTHKEY" \
   --hostname="$TS_HOSTNAME" \
   --accept-dns=false \

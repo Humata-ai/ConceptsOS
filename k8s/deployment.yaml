@@ -20,21 +20,19 @@ spec:
     spec:
       containers:
         - name: conceptsos
-          image: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/vpn:v1
+          # Rewritten by kustomize (see k8s/kustomization.yaml -> images:).
+          image: conceptsos-vpn:latest
           imagePullPolicy: Always
           ports:
-            # Headscale HTTP API + client login. This is the ONLY port the
-            # Service exposes; the Next.js app port (3000) is intentionally
-            # unreachable except via the tailnet interface inside the pod.
-            - name: headscale
-              containerPort: 8080
-          env:
-            - name: HEADSCALE_SERVER_URL
-              # Must be the URL tailnet clients will use to reach headscale.
-              # Set to the Service's external LB address (see k8s/service.yaml).
-              value: "http://35.224.100.12"
-            - name: TS_HOSTNAME
-              value: "conceptsos-app"
+            - name: https
+              containerPort: 443
+            - name: http-acme
+              containerPort: 80
+          # All per-deployment config lives in k8s/config.env, exposed as
+          # a ConfigMap. No hostnames or URLs are hardcoded in this file.
+          envFrom:
+            - configMapRef:
+                name: conceptsos-config
           # Real TUN device so Next.js can bind to the tailnet IP.
           securityContext:
             capabilities:
@@ -44,18 +42,24 @@ spec:
               mountPath: /dev/net/tun
             - name: state
               mountPath: /var/lib/conceptsos-vpn
+          # TCP probes only. We cannot do an HTTPS semantic probe because
+          # autocert refuses TLS handshakes without SNI, and we cannot do
+          # HTTP because port 80 is only the ACME challenge handler. TCP is
+          # enough to prove headscale is bound; once the pod is Ready the
+          # LB routes traffic, Let's Encrypt reaches port 80, and TLS starts
+          # working on port 443.
           readinessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 5
+            tcpSocket:
+              port: 443
+            initialDelaySeconds: 10
             periodSeconds: 5
+            failureThreshold: 30
           livenessProbe:
-            httpGet:
-              path: /health
-              port: 8080
-            initialDelaySeconds: 30
+            tcpSocket:
+              port: 443
+            initialDelaySeconds: 60
             periodSeconds: 20
+            failureThreshold: 5
           resources:
             requests:
               cpu: "50m"
@@ -69,4 +73,8 @@ spec:
             path: /dev/net/tun
             type: CharDevice
         - name: state
+          # Persist cert cache + headscale DB across restarts. For SQLite +
+          # single replica this is fine as an ephemeral emptyDir for now,
+          # but on Recreate the ACME cert survives via the state on the
+          # pod's lifetime; consider swapping to a PVC for real durability.
           emptyDir: {}

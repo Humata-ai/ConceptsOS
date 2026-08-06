@@ -69,8 +69,8 @@ COPY docker/headscale.yaml.tmpl /etc/conceptsos-vpn/headscale.yaml.tmpl
 RUN chmod +x /usr/local/bin/entrypoint.sh \
  && mkdir -p /var/lib/conceptsos-vpn/headscale /var/lib/conceptsos-vpn/tailscaled /var/run/tailscale
 
-# Headscale HTTP API + embedded DERP STUN
-EXPOSE 8080 3478/udp
+# Headscale HTTP(S) API + ACME challenge + embedded DERP STUN
+EXPOSE 80 443 8080 3478/udp
 # NOTE: port 3000 (Next.js) is intentionally NOT exposed — the app is
 # reachable only via the tailnet.
 

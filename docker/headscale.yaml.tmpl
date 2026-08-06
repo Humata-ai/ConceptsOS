@@ -4,6 +4,17 @@
 
 server_url: ${HEADSCALE_SERVER_URL}
 listen_addr: ${HEADSCALE_LISTEN_ADDR}
+
+# TLS. When HEADSCALE_TLS_LETSENCRYPT_HOSTNAME is set, headscale runs its
+# own ACME client against Let's Encrypt for that hostname. Cert cache lives
+# on the state volume so restarts don't re-issue. Requires port 80 reachable
+# for the HTTP-01 challenge and (typically) port 443 for the TLS server.
+tls_letsencrypt_hostname: ${HEADSCALE_TLS_LETSENCRYPT_HOSTNAME}
+tls_letsencrypt_cache_dir: ${HEADSCALE_TLS_CACHE_DIR}
+tls_letsencrypt_challenge_type: ${HEADSCALE_TLS_CHALLENGE_TYPE}
+tls_letsencrypt_listen: ":${HEADSCALE_ACME_HTTP_PORT}"
+tls_cert_path: "${HEADSCALE_TLS_CERT_PATH}"
+tls_key_path: "${HEADSCALE_TLS_KEY_PATH}"
 metrics_listen_addr: ${HEADSCALE_METRICS_ADDR}
 grpc_listen_addr: 127.0.0.1:50443
 grpc_allow_insecure: false
