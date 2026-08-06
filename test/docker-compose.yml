@@ -1,0 +1,87 @@
+# ConceptsOS local end-to-end test.
+#
+#   conceptsos     — the single all-in-one image (headscale + tailscale + Next.js)
+#   outside-tester — sits on the docker network but does NOT join the tailnet;
+#                    used to prove the app is unreachable from outside the VPN
+#   inside-tester  — joins the tailnet via a preauth key; proves the app IS
+#                    reachable over the tailnet
+#
+# Driven by ./run.sh.
+
+services:
+  conceptsos:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: conceptsos:test
+    container_name: conceptsos
+    environment:
+      HEADSCALE_SERVER_URL: "http://conceptsos:8080"
+      TS_HOSTNAME: "conceptsos-app"
+    # Only headscale is exposed on the docker network. Next.js is bound
+    # inside the container to the tailnet IP, so it is NOT reachable via
+    # the container's docker-network IP.
+    expose:
+      - "8080"
+      - "3478/udp"
+    # Real TUN so Next.js can bind to the tailnet IP inside the container.
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - "/dev/net/tun:/dev/net/tun"
+    networks:
+      - hs-net
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  # Tester image: minimal debian with tailscale + curl. Same image serves
+  # both "inside" and "outside" roles; role is chosen by the JOIN_TAILNET env.
+  tester-build:
+    build:
+      context: ./tester
+      dockerfile: Dockerfile
+    image: conceptsos-tester:test
+    command: ["true"]
+    profiles: ["build-only"]
+
+  outside-tester:
+    image: conceptsos-tester:test
+    container_name: outside-tester
+    depends_on:
+      conceptsos:
+        condition: service_healthy
+    environment:
+      JOIN_TAILNET: "false"
+    networks:
+      - hs-net
+    # Keep it alive so run.sh can `docker compose exec` into it.
+    command: ["sleep", "infinity"]
+
+  inside-tester:
+    image: conceptsos-tester:test
+    container_name: inside-tester
+    depends_on:
+      conceptsos:
+        condition: service_healthy
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    devices:
+      - "/dev/net/tun:/dev/net/tun"
+    environment:
+      JOIN_TAILNET: "true"
+      HEADSCALE_URL: "http://conceptsos:8080"
+      TS_HOSTNAME: "inside-tester"
+      # TS_AUTHKEY is injected by run.sh after minting via headscale CLI.
+      TS_AUTHKEY: "${TS_AUTHKEY:-}"
+    networks:
+      - hs-net
+    command: ["/usr/local/bin/tester-entrypoint.sh"]
+
+networks:
+  hs-net:
+    driver: bridge
