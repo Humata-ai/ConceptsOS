@@ -5,11 +5,14 @@ metadata:
   labels:
     app: conceptsos
 spec:
+  # Public LB, but ONLY for headscale. The Next.js app runs on the tailnet
+  # interface inside the pod (100.64.x.x:3000) and has no Service — the
+  # only way to reach it is to be a tailnet peer.
   type: LoadBalancer
   selector:
     app: conceptsos
   ports:
-    - name: http
+    - name: headscale
       port: 80
-      targetPort: 3000
+      targetPort: 8080
       protocol: TCP
