@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: conceptsos
+  labels:
+    app: conceptsos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: conceptsos
+  template:
+    metadata:
+      labels:
+        app: conceptsos
+    spec:
+      containers:
+        - name: conceptsos
+          image: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/app:latest
+          # Dockerfile's default CMD is `bash`, which exits immediately in k8s
+          # (no TTY). Override with a sleep so the pod stays running.
+          command: ["sleep", "infinity"]
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "250m"
+              memory: "256Mi"
