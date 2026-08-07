@@ -23,10 +23,14 @@ data:
     {
       email dan@humata.ai
       admin off
-      auto_https disable_redirects
       servers {
         protocols h1 h2 h2c
       }
+    }
+
+    # Bind :80 for ACME + HTTP→HTTPS redirects on both hosts.
+    http://nb.conceptsos.com, http://signal.nb.conceptsos.com {
+      redir https://{host}{uri} permanent
     }
 
     # ---- Public front door: dashboard + mgmt HTTP + mgmt gRPC (:443) ----
@@ -118,7 +122,7 @@ spec:
             - { name: caddyfile, mountPath: /etc/caddy }
             - { name: data,      mountPath: /data }
           readinessProbe:
-            tcpSocket: { port: 80 }
+            tcpSocket: { port: 443 }
             initialDelaySeconds: 5
             periodSeconds: 5
           resources:
