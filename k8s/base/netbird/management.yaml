@@ -105,12 +105,11 @@ spec:
   externalTrafficPolicy: Local
   selector:
     app: netbird-management
+  # NetBird management serves both HTTP API and gRPC on a single port
+  # (--port=33073). TLS termination is out-of-scope for P0 — add an
+  # ingress-nginx + cert-manager in front for public HTTPS on :443.
   ports:
-    - name: mgmt-grpc
+    - name: mgmt
       port: 33073
       targetPort: 33073
-      protocol: TCP
-    - name: mgmt-http
-      port: 443
-      targetPort: 33071
       protocol: TCP
