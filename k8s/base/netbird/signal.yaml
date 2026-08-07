@@ -1,0 +1,49 @@
+# NetBird signal service: relays WireGuard connection candidates between
+# peers during ICE negotiation. Stateless.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netbird-signal
+  labels:
+    app: netbird-signal
+    role: control
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: netbird-signal }
+  template:
+    metadata:
+      labels: { app: netbird-signal, role: control }
+    spec:
+      containers:
+        - name: signal
+          image: netbirdio/signal:0.30.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--port=10000"
+            - "--log-file=console"
+          ports:
+            - name: signal-grpc
+              containerPort: 10000
+          readinessProbe:
+            tcpSocket: { port: 10000 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: "20m",  memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-signal
+  labels: { app: netbird-signal }
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector: { app: netbird-signal }
+  ports:
+    - name: signal-grpc
+      port: 10000
+      targetPort: 10000
+      protocol: TCP

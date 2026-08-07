@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cust-dans-computer-nb
+  labels:
+    customer: dans-computer
+    overlay: netbird

@@ -1,0 +1,28 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# P1 pilot: `dans-computer` on the NetBird overlay, running in parallel
+# with the existing Headscale-flavored `cust-dans-computer` namespace.
+#
+# Deploy with:  kubectl apply -k k8s/overlays/customers/dans-computer-nb/
+
+namespace: cust-dans-computer-nb
+
+resources:
+  - namespace.yaml
+  - ../../../base/node-nb
+
+configMapGenerator:
+  - name: conceptsos-node-nb-config
+    envs:
+      - config.env
+
+secretGenerator:
+  - name: conceptsos-node-nb-secret
+    envs:
+      - secret.env
+
+images:
+  - name: conceptsos-vpn
+    newName: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/vpn
+    newTag: v5-nb

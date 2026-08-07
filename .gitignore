@@ -1,1 +1,8 @@
 *.lb-ip
+*.lb-ip.tmp
+
+# Secrets — per-overlay Secret material lives in *.env but is generated,
+# never committed. Templates end in .env.example.
+k8s/overlays/**/secret.env
+k8s/overlays/netbird-prod/oidc.env
+k8s/overlays/netbird-prod/turn.env

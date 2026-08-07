@@ -1,0 +1,116 @@
+# NetBird management service.
+#
+# Responsibilities:
+#   - Peer registration (setup keys + OIDC device flow).
+#   - Policy / group / route distribution.
+#   - Hands out short-lived HMAC creds for coturn.
+#   - Private DNS zone `netbird.conceptsos.com`.
+#
+# Public surface: :443 (HTTPS API) and :33073 (mgmt gRPC over TLS),
+# both fronted by the `netbird-management` Service (LoadBalancer).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netbird-management
+  labels:
+    app: netbird-management
+    role: control
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # single writer against the sqlite/file store
+  selector:
+    matchLabels:
+      app: netbird-management
+  template:
+    metadata:
+      labels:
+        app: netbird-management
+        role: control
+    spec:
+      containers:
+        - name: management
+          image: netbirdio/management:0.30.2
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--port=33073"
+            - "--log-file=console"
+            - "--disable-anonymous-metrics=true"
+            - "--single-account-mode-domain=$(NB_SINGLE_ACCOUNT_DOMAIN)"
+            - "--dns-domain=$(NB_DNS_DOMAIN)"
+            - "--config=/etc/netbird/management.json"
+          ports:
+            - name: mgmt-grpc
+              containerPort: 33073
+            - name: mgmt-http
+              containerPort: 33071
+          envFrom:
+            - configMapRef:
+                name: netbird-mgmt-config
+            - secretRef:
+                name: netbird-mgmt-secrets
+          volumeMounts:
+            - name: state
+              mountPath: /var/lib/netbird
+            - name: mgmt-config
+              mountPath: /etc/netbird
+              readOnly: false
+          readinessProbe:
+            tcpSocket: { port: 33073 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket: { port: 33073 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "50m",  memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+      initContainers:
+        # Render management.json from the ConfigMap template with envsubst
+        # so we can keep OIDC / coturn secrets out of the checked-in config.
+        - name: render-config
+          image: debian:bookworm-slim
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -eu
+              apt-get update >/dev/null && apt-get install -y --no-install-recommends gettext-base >/dev/null
+              envsubst < /template/management.json.tmpl > /etc/netbird/management.json
+              echo "rendered /etc/netbird/management.json"
+          envFrom:
+            - configMapRef: { name: netbird-mgmt-config }
+            - secretRef:    { name: netbird-mgmt-secrets }
+          volumeMounts:
+            - { name: mgmt-config-tmpl, mountPath: /template }
+            - { name: mgmt-config,      mountPath: /etc/netbird }
+      volumes:
+        - name: state
+          # TODO: PVC for durable peer store. emptyDir loses peers on restart.
+          emptyDir: {}
+        - name: mgmt-config
+          emptyDir: {}
+        - name: mgmt-config-tmpl
+          configMap:
+            name: netbird-management-json-tmpl
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-management
+  labels:
+    app: netbird-management
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector:
+    app: netbird-management
+  ports:
+    - name: mgmt-grpc
+      port: 33073
+      targetPort: 33073
+      protocol: TCP
+    - name: mgmt-http
+      port: 443
+      targetPort: 33071
+      protocol: TCP

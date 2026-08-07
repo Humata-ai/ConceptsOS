@@ -1,0 +1,45 @@
+# NetBird dashboard (React SPA). Talks to management HTTP API for user
+# state and to the OIDC provider for auth. Fronted at /
+# (same hostname as management).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netbird-dashboard
+  labels:
+    app: netbird-dashboard
+    role: control
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: netbird-dashboard }
+  template:
+    metadata:
+      labels: { app: netbird-dashboard, role: control }
+    spec:
+      containers:
+        - name: dashboard
+          image: netbirdio/dashboard:v2.7.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { name: http, containerPort: 80 }
+          envFrom:
+            - configMapRef: { name: netbird-dashboard-config }
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: "20m",  memory: "64Mi" }
+            limits:   { cpu: "200m", memory: "256Mi" }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-dashboard
+  labels: { app: netbird-dashboard }
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector: { app: netbird-dashboard }
+  ports:
+    - { name: http, port: 80, targetPort: 80, protocol: TCP }

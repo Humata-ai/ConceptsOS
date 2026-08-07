@@ -1,0 +1,82 @@
+# coturn: STUN/TURN. NetBird management hands out short-lived HMAC creds
+# so we don't need per-user static credentials.
+#
+# The `use-auth-secret` mode uses the shared secret in the
+# `netbird-mgmt-secrets` Secret (key: TURN_SHARED_SECRET) — the same one
+# the management service signs turnCredentials with.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coturn-config
+data:
+  turnserver.conf: |
+    listening-port=3478
+    tls-listening-port=5349
+    fingerprint
+    lt-cred-mech
+    use-auth-secret
+    static-auth-secret=${TURN_SHARED_SECRET}
+    realm=turn.conceptsos.com
+    total-quota=100
+    stale-nonce=600
+    no-multicast-peers
+    no-cli
+    # NOTE: relay-ip / external-ip are supplied at runtime by the wrapper
+    # below because we don't know the LB IP until Service is created.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coturn
+  labels: { app: coturn, role: control }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: coturn } }
+  template:
+    metadata:
+      labels: { app: coturn, role: control }
+    spec:
+      hostNetwork: false
+      containers:
+        - name: coturn
+          image: coturn/coturn:4.6.2-r6
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-c"]
+          # Render the shared secret into the config, then exec turnserver.
+          args:
+            - |
+              set -eu
+              sed "s|\${TURN_SHARED_SECRET}|$TURN_SHARED_SECRET|g" \
+                /raw/turnserver.conf > /etc/coturn/turnserver.conf
+              exec turnserver -c /etc/coturn/turnserver.conf --external-ip=$(dig +short turn.conceptsos.com | head -n1)
+          envFrom:
+            - secretRef: { name: netbird-mgmt-secrets }
+          ports:
+            - { name: stun-udp, containerPort: 3478, protocol: UDP }
+            - { name: stun-tcp, containerPort: 3478, protocol: TCP }
+            - { name: turns,    containerPort: 5349, protocol: TCP }
+          volumeMounts:
+            - { name: config-raw, mountPath: /raw }
+            - { name: config-out, mountPath: /etc/coturn }
+          resources:
+            requests: { cpu: "50m",  memory: "64Mi" }
+            limits:   { cpu: "500m", memory: "256Mi" }
+      volumes:
+        - name: config-raw
+          configMap: { name: coturn-config }
+        - name: config-out
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coturn
+  labels: { app: coturn }
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector: { app: coturn }
+  ports:
+    - { name: stun-udp, port: 3478, targetPort: 3478, protocol: UDP }
+    - { name: stun-tcp, port: 3478, targetPort: 3478, protocol: TCP }
+    - { name: turns,    port: 5349, targetPort: 5349, protocol: TCP }

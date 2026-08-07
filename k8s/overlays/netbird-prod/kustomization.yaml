@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# NetBird control plane, production.
+#
+# Public hosts (require DNS records → LB IPs after first apply):
+#   nb.conceptsos.com    → netbird-management  (:443, :33073) + netbird-dashboard (:80)
+#   turn.conceptsos.com  → coturn              (:3478 udp/tcp, :5349)
+#   signal.nb.conceptsos.com → netbird-signal  (:10000)
+#
+# Deploy with:  kubectl apply -k k8s/overlays/netbird-prod/
+#
+# Before first apply, populate:
+#   k8s/overlays/netbird-prod/oidc.env      # OIDC_CLIENT_ID / SECRET, GOOGLE_SERVICE_ACCOUNT_JSON, ...
+#   k8s/overlays/netbird-prod/turn.env      # TURN_SHARED_SECRET
+# Both are gitignored (see .gitignore).
+
+namespace: netbird
+
+resources:
+  - namespace.yaml
+  - ../../base/netbird
+
+configMapGenerator:
+  - name: netbird-mgmt-config
+    envs:
+      - mgmt.env
+  - name: netbird-dashboard-config
+    envs:
+      - dashboard.env
+
+secretGenerator:
+  - name: netbird-mgmt-secrets
+    envs:
+      - oidc.env
+      - turn.env
