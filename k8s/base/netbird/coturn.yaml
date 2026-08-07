@@ -67,10 +67,13 @@ spec:
         - name: config-out
           emptyDir: {}
 ---
+# GCP LoadBalancer Services can't mix protocols; split UDP and TCP.
+# Advertise turn.conceptsos.com as an A record pointing at BOTH LB IPs
+# (or use two different hostnames — see docs/netbird-p0-runbook.md).
 apiVersion: v1
 kind: Service
 metadata:
-  name: coturn
+  name: coturn-udp
   labels: { app: coturn }
 spec:
   type: LoadBalancer
@@ -78,5 +81,16 @@ spec:
   selector: { app: coturn }
   ports:
     - { name: stun-udp, port: 3478, targetPort: 3478, protocol: UDP }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: coturn-tcp
+  labels: { app: coturn }
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local
+  selector: { app: coturn }
+  ports:
     - { name: stun-tcp, port: 3478, targetPort: 3478, protocol: TCP }
     - { name: turns,    port: 5349, targetPort: 5349, protocol: TCP }

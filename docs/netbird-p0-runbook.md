@@ -58,10 +58,16 @@ Then locally:
 
 ```bash
 cp k8s/overlays/netbird-prod/oidc.env.example k8s/overlays/netbird-prod/oidc.env
-$EDITOR k8s/overlays/netbird-prod/oidc.env   # fill in the values above
+$EDITOR k8s/overlays/netbird-prod/oidc.env   # fill in client id/secret + customer id
 
-cp k8s/overlays/netbird-prod/turn.env.example k8s/overlays/netbird-prod/turn.env
-sed -i "s/REPLACE_ME.*/$(openssl rand -hex 32)/" k8s/overlays/netbird-prod/turn.env
+# The service-account key must be BASE64-ENCODED JSON:
+SA_B64=$(base64 -w0 < /path/to/netbird-directory-sync.json)
+sed -i "s|^GOOGLE_SERVICE_ACCOUNT_JSON=.*|GOOGLE_SERVICE_ACCOUNT_JSON=$SA_B64|" \
+  k8s/overlays/netbird-prod/oidc.env
+
+# turn.env only needed if you didn't seed it during the initial deploy.
+[ -f k8s/overlays/netbird-prod/turn.env ] || \
+  echo "TURN_SHARED_SECRET=$(openssl rand -hex 32)" > k8s/overlays/netbird-prod/turn.env
 ```
 
 Both files are `.gitignore`d.
