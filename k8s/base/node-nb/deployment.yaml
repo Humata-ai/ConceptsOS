@@ -1,11 +1,10 @@
-# One customer's app pod, NetBird-flavored (VPN_MODE=netbird-node).
+# One customer's app pod (VPN_MODE=netbird-node).
 # Runs the netbird agent + Next.js and joins the shared NetBird management
 # plane at $NB_MANAGEMENT_URL using a setup key issued at signup.
 #
-# Same shape as k8s/base/node/ but for the new stack:
-#   - Interface `wt0` instead of `tailscale0`.
+#   - Interface `wt0` (WireGuard).
 #   - HOSTNAME is the NetBird WgIP.
-#   - No Service — reachable only via NetBird overlay.
+#   - No Service — reachable only via the NetBird overlay.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

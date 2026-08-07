@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: cust-dans-computer
-  labels:
-    customer: dans-computer

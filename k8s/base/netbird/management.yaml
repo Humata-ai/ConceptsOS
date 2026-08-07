@@ -8,6 +8,19 @@
 #
 # Public surface: :443 (HTTPS API) and :33073 (mgmt gRPC over TLS),
 # both fronted by the `netbird-management` Service (LoadBalancer).
+# Durable store for the SQLite mgmt DB. 1Gi is overkill
+# (the DB is < 1MB in practice) but is the smallest GCE PD size.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netbird-mgmt-state
+  labels: { app: netbird-management }
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -86,8 +99,8 @@ spec:
             - { name: mgmt-config,      mountPath: /etc/netbird }
       volumes:
         - name: state
-          # TODO: PVC for durable peer store. emptyDir loses peers on restart.
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: netbird-mgmt-state
         - name: mgmt-config
           emptyDir: {}
         - name: mgmt-config-tmpl
@@ -102,7 +115,7 @@ metadata:
     app: netbird-management
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Local
+  externalTrafficPolicy: Cluster
   selector:
     app: netbird-management
   # NetBird management serves both HTTP API and gRPC on a single port

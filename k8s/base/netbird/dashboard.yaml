@@ -39,7 +39,7 @@ metadata:
   labels: { app: netbird-dashboard }
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Local
+  externalTrafficPolicy: Cluster
   selector: { app: netbird-dashboard }
   ports:
     - { name: http, port: 80, targetPort: 80, protocol: TCP }

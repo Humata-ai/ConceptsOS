@@ -15,8 +15,7 @@
 #   * $NB_API_URL   (default: https://nb.conceptsos.com)
 #   * $NB_API_TOKEN — a NetBird service-user PAT with admin scope.
 #
-# The parallel-overlay pilot runs both this and bin/provision.sh at the
-# same time; see docs/netbird-migration.md §Rollout / P1.
+# See docs/netbird-migration.md for context.
 
 set -euo pipefail
 

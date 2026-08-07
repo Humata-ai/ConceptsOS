@@ -77,7 +77,7 @@ metadata:
   labels: { app: coturn }
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Local
+  externalTrafficPolicy: Cluster
   selector: { app: coturn }
   ports:
     - { name: stun-udp, port: 3478, targetPort: 3478, protocol: UDP }
@@ -89,7 +89,7 @@ metadata:
   labels: { app: coturn }
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Local
+  externalTrafficPolicy: Cluster
   selector: { app: coturn }
   ports:
     - { name: stun-tcp, port: 3478, targetPort: 3478, protocol: TCP }
