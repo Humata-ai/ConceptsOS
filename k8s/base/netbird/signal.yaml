@@ -39,8 +39,8 @@ metadata:
   name: netbird-signal
   labels: { app: netbird-signal }
 spec:
-  type: LoadBalancer
-  externalTrafficPolicy: Cluster
+  # Fronted by netbird-edge (Caddy) on signal.nb.conceptsos.com:443.
+  type: ClusterIP
   selector: { app: netbird-signal }
   ports:
     - name: signal-grpc

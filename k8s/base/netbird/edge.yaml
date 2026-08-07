@@ -1,0 +1,152 @@
+# TLS edge for the NetBird control plane.
+#
+# Caddy fronts:
+#   nb.conceptsos.com:443             → netbird-dashboard (SPA) on /
+#                                     → netbird-management (:33073 h2c)
+#                                       for /api/* and /management.*
+#                                       (NetBird 0.30 multiplexes HTTP + gRPC
+#                                       on a single h2c port)
+#   nb.conceptsos.com:33073           → same mgmt gRPC (for clients that
+#                                       insist on the historical port).
+#   signal.nb.conceptsos.com:443      → netbird-signal (:10000 gRPC / h2c)
+#
+# ACME HTTP-01 is served on :80 (both hostnames share the LB IP).
+#
+# Backends (netbird-management, netbird-dashboard, netbird-signal) are
+# ClusterIP only — no direct public access to plaintext ports.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: netbird-edge-caddyfile
+data:
+  Caddyfile: |
+    {
+      email dan@humata.ai
+      admin off
+      auto_https disable_redirects
+      servers {
+        protocols h1 h2 h2c
+      }
+    }
+
+    # ---- Public front door: dashboard + mgmt HTTP + mgmt gRPC (:443) ----
+    nb.conceptsos.com {
+      encode zstd gzip
+
+      # mgmt gRPC + REST both live on :33073 (h2c). Route by path + type.
+      @mgmt {
+        path /api/* /management.*
+      }
+      @grpc header Content-Type application/grpc*
+      handle @grpc {
+        reverse_proxy h2c://netbird-management:33073 {
+          transport http {
+            versions h2c
+          }
+        }
+      }
+      handle @mgmt {
+        reverse_proxy h2c://netbird-management:33073 {
+          transport http {
+            versions h2c
+          }
+        }
+      }
+
+      # Everything else → dashboard SPA
+      handle {
+        reverse_proxy netbird-dashboard:80
+      }
+    }
+
+    # ---- Legacy mgmt gRPC port kept for clients pinned to :33073 ----
+    nb.conceptsos.com:33073 {
+      reverse_proxy h2c://netbird-management:33073 {
+        transport http {
+          versions h2c
+        }
+      }
+    }
+
+    # ---- Signal (gRPC) on :443 ----
+    signal.nb.conceptsos.com {
+      reverse_proxy h2c://netbird-signal:10000 {
+        transport http {
+          versions h2c
+        }
+      }
+    }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netbird-edge-data
+  labels: { app: netbird-edge }
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netbird-edge
+  labels:
+    app: netbird-edge
+    role: control
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate  # single writer for the ACME cert cache on the PVC
+  selector:
+    matchLabels: { app: netbird-edge }
+  template:
+    metadata:
+      labels: { app: netbird-edge, role: control }
+    spec:
+      containers:
+        - name: caddy
+          image: caddy:2.8.4
+          command: ["caddy"]
+          args: ["run", "--config", "/etc/caddy/Caddyfile", "--adapter", "caddyfile"]
+          ports:
+            - { name: http,     containerPort: 80 }
+            - { name: https,    containerPort: 443 }
+            - { name: mgmt-grpc, containerPort: 33073 }
+          volumeMounts:
+            - { name: caddyfile, mountPath: /etc/caddy }
+            - { name: data,      mountPath: /data }
+          readinessProbe:
+            tcpSocket: { port: 80 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests: { cpu: "50m",  memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+      volumes:
+        - name: caddyfile
+          configMap:
+            name: netbird-edge-caddyfile
+        - name: data
+          persistentVolumeClaim:
+            claimName: netbird-edge-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-edge
+  labels: { app: netbird-edge }
+  annotations:
+    # Static regional external IP (see terraform / gcloud).
+    # Address name: `netbird-edge` in project conceptsos-prd, us-central1.
+    networking.gke.io/load-balancer-type: "External"
+spec:
+  type: LoadBalancer
+  loadBalancerIP: 34.10.233.209
+  externalTrafficPolicy: Cluster
+  selector: { app: netbird-edge }
+  ports:
+    - { name: http,      port: 80,    targetPort: 80,    protocol: TCP }
+    - { name: https,     port: 443,   targetPort: 443,   protocol: TCP }
+    - { name: mgmt-grpc, port: 33073, targetPort: 33073, protocol: TCP }
