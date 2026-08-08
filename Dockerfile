@@ -1,13 +1,10 @@
 # syntax=docker/dockerfile:1.7
 #
-# ConceptsOS runtime image (NetBird-only, aka `v6-nb-only`).
+# ConceptsOS: single Debian image running Headscale + Tailscale + the Next.js
+# app in one container. The Next.js app binds only to the tailnet interface,
+# so it is reachable *only* by peers that have joined this container's tailnet.
 #
-# Legacy Headscale + Tailscale stacks were removed after the NetBird
-# migration completed. See docs/netbird-migration.md.
-#
-# Rollback path (should we ever need to reintroduce the legacy stack):
-# `git revert` this commit and the accompanying entrypoint/manifest
-# deletions, then rebuild. History is preserved in git.
+# See: notes/GTD/projects/active_projects/ConceptsOS/tailscale_headscale_single_image_design.md
 
 # --- deps: install node_modules for the Next.js app -------------------------
 FROM node:20-bookworm-slim AS deps
@@ -23,35 +20,39 @@ COPY app/ ./
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
-# --- runtime ---------------------------------------------------------------
+# --- runtime: single Debian image with headscale + tailscale + node ---------
 FROM debian:bookworm-slim AS runner
 
-# Pinned upstream version. Bump in a single commit so rollback is a
-# single `git revert`.
-ARG NETBIRD_VERSION=0.30.2
+ARG HEADSCALE_VERSION=0.23.0
 ARG TARGETARCH=amd64
 
 ENV DEBIAN_FRONTEND=noninteractive \
     NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3000 \
-    STATE_DIR=/var/lib/conceptsos-vpn \
-    VPN_MODE=netbird-node
+    STATE_DIR=/var/lib/conceptsos-vpn
 
+# Base packages, Node.js runtime, tailscale apt repo, headscale .deb.
 RUN set -eux; \
     apt-get update; \
     apt-get install -y --no-install-recommends \
-        ca-certificates curl gnupg iproute2 iptables jq tini procps; \
+        ca-certificates curl gnupg iproute2 iptables jq tini gettext-base procps; \
     # Node.js 20.x (nodesource)
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash -; \
     apt-get install -y --no-install-recommends nodejs; \
-    # NetBird client
-    curl -fsSL -o /tmp/netbird.tar.gz \
-        "https://github.com/netbirdio/netbird/releases/download/v${NETBIRD_VERSION}/netbird_${NETBIRD_VERSION}_linux_${TARGETARCH}.tar.gz"; \
-    tar -xzf /tmp/netbird.tar.gz -C /usr/local/bin netbird; \
-    rm -f /tmp/netbird.tar.gz; \
-    chmod +x /usr/local/bin/netbird; \
-    /usr/local/bin/netbird version; \
+    # Tailscale
+    curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.noarmor.gpg \
+        -o /usr/share/keyrings/tailscale-archive-keyring.gpg; \
+    curl -fsSL https://pkgs.tailscale.com/stable/debian/bookworm.tailscale-keyring.list \
+        -o /etc/apt/sources.list.d/tailscale.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends tailscale; \
+    # Headscale (.deb from upstream releases)
+    curl -fsSL -o /tmp/headscale.deb \
+        "https://github.com/juanfont/headscale/releases/download/v${HEADSCALE_VERSION}/headscale_${HEADSCALE_VERSION}_linux_${TARGETARCH}.deb"; \
+    dpkg -i /tmp/headscale.deb; \
+    rm -f /tmp/headscale.deb; \
+    # Cleanup
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
 
@@ -62,13 +63,15 @@ COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/public ./public
 
-# Entrypoint
+# Entrypoint + headscale config template
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+COPY docker/headscale.yaml.tmpl /etc/conceptsos-vpn/headscale.yaml.tmpl
 RUN chmod +x /usr/local/bin/entrypoint.sh \
- && mkdir -p /var/lib/conceptsos-vpn/netbird /var/run/netbird
+ && mkdir -p /var/lib/conceptsos-vpn/headscale /var/lib/conceptsos-vpn/tailscaled /var/run/tailscale
 
+# Headscale HTTP(S) API + ACME challenge + embedded DERP STUN
+EXPOSE 80 443 8080 3478/udp
 # NOTE: port 3000 (Next.js) is intentionally NOT exposed — the app is
-# reachable only via the NetBird overlay (interface wt0). STUN/TURN
-# lives in the coturn Deployment, not in this image.
+# reachable only via the tailnet.
 
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.sh"]
