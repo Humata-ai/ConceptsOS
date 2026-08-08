@@ -1,0 +1,20 @@
+# Durable state for the shared headscale control plane. Holds:
+#   * sqlite DB (tailnet identity — noise/private/derp keys)
+#   * Let's Encrypt cert cache
+#
+# Without this, restarting the pod wipes the LE cert and can burn the
+# "5 certificates per exact set of identifiers per 168h" rate limit for
+# hs.conceptsos.com very quickly.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: headscale-state
+  labels:
+    app: headscale
+    role: control
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi

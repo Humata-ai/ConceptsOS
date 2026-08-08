@@ -62,6 +62,5 @@ spec:
               memory: "512Mi"
       volumes:
         - name: state
-          # TODO: PVC for durable headscale DB + cert cache. emptyDir is
-          # fine for the demo; loses tailnet identity on pod restart.
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: headscale-state

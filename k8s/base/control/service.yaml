@@ -7,7 +7,11 @@ metadata:
     role: control
 spec:
   type: LoadBalancer
-  externalTrafficPolicy: Local
+  # Cluster (not Local): with Local, pods on the same node as the
+  # headscale pod cannot hairpin back through the external LB IP
+  # (customer node pods → hs.conceptsos.com times out). Headscale does
+  # not need real client IPs, so preservation isn't worth the breakage.
+  externalTrafficPolicy: Cluster
   selector:
     app: headscale
   ports:
