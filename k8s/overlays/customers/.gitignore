@@ -1,3 +1,0 @@
-# never commit real preauth keys; secret.env is per-customer and generated
-# by the signup service at provisioning time.
-*/secret.env

@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: conceptsos
+  labels:
+    app: conceptsos
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: conceptsos
+  template:
+    metadata:
+      labels:
+        app: conceptsos
+    spec:
+      containers:
+        - name: conceptsos
+          image: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/app:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+          env:
+            - name: PORT
+              value: "3000"
+            - name: HOSTNAME
+              value: "0.0.0.0"
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
