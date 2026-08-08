@@ -6,6 +6,10 @@ metadata:
     app: conceptsos
 spec:
   replicas: 1
+  # Only one pod can hold the LB IP + wg0 peer table at a time. Rolling
+  # would briefly double-bind and confuse WireGuard peers.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: conceptsos
@@ -19,24 +23,30 @@ spec:
           image: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/app:latest
           imagePullPolicy: Always
           ports:
-            - name: http
-              containerPort: 3000
-          env:
-            - name: PORT
-              value: "3000"
-            - name: HOSTNAME
-              value: "0.0.0.0"
+            - name: wg
+              containerPort: 51820
+              protocol: UDP
+          # NET_ADMIN is required to create the wg0 interface and set routes.
+          # Kernel WireGuard is used (built into GKE Container-Optimized OS
+          # since GKE 1.24), so no /dev/net/tun mount is needed.
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN"]
+          volumeMounts:
+            - name: wg-config
+              mountPath: /etc/wireguard-src
+              readOnly: true
+          # HTTP probes won't work because Next.js binds to the tunnel IP
+          # only; use an exec probe against the wg interface instead.
           readinessProbe:
-            httpGet:
-              path: /
-              port: 3000
+            exec:
+              command: ["sh", "-c", "wg show wg0 >/dev/null"]
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
-            httpGet:
-              path: /
-              port: 3000
-            initialDelaySeconds: 15
+            exec:
+              command: ["sh", "-c", "wg show wg0 >/dev/null"]
+            initialDelaySeconds: 30
             periodSeconds: 20
           resources:
             requests:
@@ -45,3 +55,11 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
+      volumes:
+        - name: wg-config
+          secret:
+            secretName: wg-server
+            defaultMode: 0400
+            items:
+              - key: wg0.conf
+                path: wg0.conf

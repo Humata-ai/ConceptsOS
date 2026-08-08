@@ -5,11 +5,13 @@ metadata:
   labels:
     app: conceptsos
 spec:
+  # Only the WireGuard endpoint is public. The Next.js app is bound to
+  # the tunnel IP and unreachable from the internet.
   type: LoadBalancer
   selector:
     app: conceptsos
   ports:
-    - name: http
-      port: 80
-      targetPort: 3000
-      protocol: TCP
+    - name: wg
+      port: 51820
+      targetPort: 51820
+      protocol: UDP

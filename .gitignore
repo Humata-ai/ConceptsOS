@@ -1,0 +1,13 @@
+# WireGuard server key + peer table (contains all client private keys).
+# Never commit — treat this dir like a password vault. Back it up encrypted.
+.wg-state/
+
+# terraform local state / plans
+terraform/.terraform/
+terraform/*.tfstate*
+terraform/*.tfplan
+terraform/crash.log
+
+# node
+app/node_modules/
+app/.next/
