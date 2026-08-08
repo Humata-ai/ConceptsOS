@@ -67,7 +67,7 @@ cat <<EOF
 
 Customer '$NAME' provisioned.
   namespace : cust-$NAME
-  hostname  : $NAME.ts.conceptsos.com  (resolvable only inside this customer's tailnet)
+  hostname  : $NAME.vpn.conceptsos.com  (resolvable only inside this customer's tailnet)
   join key  : minted, valid 24h, stored in $DEST/secret.env (gitignored)
 
 Watch it come up:
