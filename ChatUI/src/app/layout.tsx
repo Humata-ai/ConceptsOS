@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
+import KeyboardInsets from "@/components/KeyboardInsets";
 import ThemeRegistry from "@/components/ThemeRegistry";
-import ViewportHeight from "@/components/ViewportHeight";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <ViewportHeight />
+        <KeyboardInsets />
         <ThemeRegistry>{children}</ThemeRegistry>
       </body>
     </html>
