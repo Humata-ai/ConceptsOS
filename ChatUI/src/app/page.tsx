@@ -312,8 +312,14 @@ export default function Page() {
     <Box
       sx={{
         display: "flex",
-        height: "var(--app-height, 100dvh)",
+        // Pin the whole app to the layout viewport so iOS can't scroll it out
+        // of view when the on-screen keyboard opens. --app-height tracks
+        // window.visualViewport.height so the column shrinks in place instead.
+        position: "fixed",
+        top: 0,
+        left: 0,
         width: "100%",
+        height: "var(--app-height, 100dvh)",
         bgcolor: "background.default",
       }}
     >
@@ -345,14 +351,10 @@ export default function Page() {
 
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <AppBar
-          position="sticky"
+          position="static"
           color="transparent"
           sx={{
-            top: 0,
-            // iOS Safari needs the -webkit prefix; MUI emits position: sticky
-            // via the prop, so belt-and-braces with an inline override too.
-            position: ["-webkit-sticky", "sticky"] as unknown as "sticky",
-            zIndex: (t) => t.zIndex.appBar,
+            flexShrink: 0,
             borderBottom: (t) => `1px solid ${t.palette.divider}`,
             bgcolor: "background.default",
           }}
@@ -395,7 +397,7 @@ export default function Page() {
           </Box>
         </Box>
 
-        <Box sx={{ borderTop: (t) => `1px solid ${t.palette.divider}`, p: 1.5 }}>
+        <Box sx={{ borderTop: (t) => `1px solid ${t.palette.divider}`, p: 1.5, flexShrink: 0 }}>
           <Paper
             variant="outlined"
             sx={{
