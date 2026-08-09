@@ -14,22 +14,47 @@ import { useEffect } from "react";
 export default function KeyboardInsets() {
   useEffect(() => {
     const vv = window.visualViewport;
-    if (!vv) return;
+
     const update = () => {
-      const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      const h =
+        vv?.height ?? window.innerHeight ?? document.documentElement.clientHeight;
+      const off = vv?.offsetTop ?? 0;
+      const inset = Math.max(0, window.innerHeight - h - off);
       const root = document.documentElement.style;
       root.setProperty("--kb-inset", `${inset}px`);
-      root.setProperty("--vv-offset-top", `${vv.offsetTop}px`);
-      root.setProperty("--vv-height", `${vv.height}px`);
+      root.setProperty("--vv-offset-top", `${off}px`);
+      root.setProperty("--vv-height", `${h}px`);
     };
+
+    // iOS still scrolls the layout viewport into view when an input is
+    // focused, even with html/body position:fixed. Actively snap it back.
+    const resetScroll = () => {
+      if (window.scrollX !== 0 || window.scrollY !== 0) {
+        window.scrollTo(0, 0);
+      }
+    };
+    const onFocusIn = () => {
+      // Reset multiple times across the focus animation frames iOS uses.
+      resetScroll();
+      requestAnimationFrame(resetScroll);
+      setTimeout(resetScroll, 50);
+      setTimeout(resetScroll, 150);
+      setTimeout(resetScroll, 350);
+    };
+
     update();
-    vv.addEventListener("resize", update);
-    vv.addEventListener("scroll", update);
+    vv?.addEventListener("resize", update);
+    vv?.addEventListener("scroll", update);
     window.addEventListener("orientationchange", update);
+    window.addEventListener("scroll", resetScroll, { passive: true });
+    document.addEventListener("focusin", onFocusIn);
+
     return () => {
-      vv.removeEventListener("resize", update);
-      vv.removeEventListener("scroll", update);
+      vv?.removeEventListener("resize", update);
+      vv?.removeEventListener("scroll", update);
       window.removeEventListener("orientationchange", update);
+      window.removeEventListener("scroll", resetScroll);
+      document.removeEventListener("focusin", onFocusIn);
     };
   }, []);
   return null;
