@@ -55,6 +55,9 @@
             </dict>
         </dict>
     </dict>
+    <!-- Skip Export Compliance prompt for every TestFlight build. App uses only Apple stdlib crypto (HTTPS). -->
+    <key>ITSAppUsesNonExemptEncryption</key>
+    <false/>
     <!-- iOS 14+ requires this so the app can hit devices on the local network. -->
     <key>NSLocalNetworkUsageDescription</key>
     <string>ConceptsOS loads a Next.js dev server running on your Mac/PC on the local network.</string>
