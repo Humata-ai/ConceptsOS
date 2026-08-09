@@ -1,178 +1,147 @@
 "use client";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Image from "next/image";
-import { SessionSidebar } from "@/components/SessionSidebar";
-import { ModelDropdown } from "@/components/ModelDropdown";
-import { Settings } from "@/components/Settings";
-import { FileBrowser } from "@/components/FileBrowser";
-import { Markdown } from "@/components/Markdown";
+import * as React from "react";
 import {
-  IconMenu, IconSettings, IconMic, IconSend, IconStop, IconAttach,
-  IconCommand, IconFolder, IconArrowDown, IconCopy, IconClose,
-} from "@/components/Icons";
-import { Message, Session, ThinkingLevel, MODELS } from "@/lib/types";
-import { loadSessions, saveSessions, newSession, newMessage, titleFrom } from "@/lib/store";
-import { ThemeId, getInitialTheme, applyTheme } from "@/lib/themes";
+  AppBar, Box, CircularProgress, Divider, Drawer, IconButton, InputBase,
+  List, ListItemButton, ListItemText, Paper, Stack, Toolbar, Tooltip,
+  Typography, useMediaQuery, useTheme,
+} from "@mui/material";
+import MenuIcon from "@mui/icons-material/Menu";
+import AddIcon from "@mui/icons-material/Add";
+import SendIcon from "@mui/icons-material/ArrowUpward";
+import StopIcon from "@mui/icons-material/Stop";
+import LightModeIcon from "@mui/icons-material/LightMode";
+import DarkModeIcon from "@mui/icons-material/DarkMode";
+import RefreshIcon from "@mui/icons-material/Refresh";
+import { Markdown } from "@/components/Markdown";
+import { ToolCard } from "@/components/ToolCard";
+import { useMode } from "@/components/ThemeRegistry";
+import type { PiSessionMeta, UiMessage } from "@/lib/types";
 
-const THINKING_LEVELS: ThinkingLevel[] = ["off", "low", "medium", "high"];
+const SIDEBAR_WIDTH = 260;
+
+function nowId() {
+  return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+interface StreamEvent {
+  type: string;
+  delta?: string;
+  name?: string;
+  input?: unknown;
+  id?: string;
+  output?: string;
+  isError?: boolean;
+  message?: string;
+}
 
 export default function Home() {
-  // ── State ────────────────────────────────────────────────
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [currentId, setCurrentId] = useState<string | null>(null);
-  const [input, setInput] = useState("");
-  const [streaming, setStreaming] = useState(false);
-  const [search, setSearch] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [fileOpen, setFileOpen] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [themeId, setThemeId] = useState<ThemeId>("night");
-  const [model, setModel] = useState<string>(MODELS[0].id);
-  const [thinking, setThinking] = useState<ThinkingLevel>("off");
-  const [showThinking, setShowThinking] = useState(true);
-  const [autoCompact, setAutoCompact] = useState(true);
-  const [queued, setQueued] = useState<string[]>([]);
-  const [scrollBtn, setScrollBtn] = useState(false);
-  const [newMsgBadge, setNewMsgBadge] = useState(false);
-  const [micOn, setMicOn] = useState(false);
+  const theme = useTheme();
+  const { mode, setMode } = useMode();
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
 
-  const abortRef = useRef<AbortController | null>(null);
-  const messagesRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const recogRef = useRef<any>(null);
+  const [sessions, setSessions] = React.useState<PiSessionMeta[]>([]);
+  const [currentId, setCurrentId] = React.useState<string | null>(null);
+  const [messages, setMessages] = React.useState<UiMessage[]>([]);
+  const [input, setInput] = React.useState("");
+  const [streaming, setStreaming] = React.useState(false);
+  const [drawerOpen, setDrawerOpen] = React.useState(false);
+  const [loadingList, setLoadingList] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
 
-  // ── Hydrate from localStorage ────────────────────────────
-  useEffect(() => {
-    const t = getInitialTheme();
-    setThemeId(t);
-    applyTheme(t);
-    const s = loadSessions();
-    setSessions(s);
-    if (s.length > 0) setCurrentId(s[0].id);
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const abortRef = React.useRef<AbortController | null>(null);
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // Load session list on mount
+  const refresh = React.useCallback(async () => {
+    setLoadingList(true);
     try {
-      const m = localStorage.getItem("chatui-model");
-      if (m) setModel(m);
-      const th = localStorage.getItem("chatui-thinking") as ThinkingLevel | null;
-      if (th) setThinking(th);
-    } catch {}
+      const r = await fetch("/api/sessions");
+      const j = await r.json();
+      setSessions(j.sessions ?? []);
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    } finally {
+      setLoadingList(false);
+    }
   }, []);
 
-  useEffect(() => { saveSessions(sessions); }, [sessions]);
-  useEffect(() => { try { localStorage.setItem("chatui-model", model); } catch {} }, [model]);
-  useEffect(() => { try { localStorage.setItem("chatui-thinking", thinking); } catch {} }, [thinking]);
+  React.useEffect(() => { void refresh(); }, [refresh]);
 
-  const current = useMemo(
-    () => sessions.find(s => s.id === currentId) ?? null,
-    [sessions, currentId]
-  );
-
-  // ── Scroll handling ──────────────────────────────────────
-  const scrollToBottom = useCallback((smooth = true) => {
-    const el = messagesRef.current;
-    if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: smooth ? "smooth" : "auto" });
-    setNewMsgBadge(false);
-  }, []);
-
-  useEffect(() => {
-    const el = messagesRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
-      setScrollBtn(!near);
-      if (near) setNewMsgBadge(false);
-    };
-    el.addEventListener("scroll", onScroll);
-    onScroll();
-    return () => el.removeEventListener("scroll", onScroll);
+  // When switching sessions, load snapshot
+  React.useEffect(() => {
+    if (!currentId) { setMessages([]); return; }
+    (async () => {
+      try {
+        const r = await fetch(`/api/sessions/${currentId}`);
+        if (!r.ok) return;
+        const snap = await r.json();
+        const msgs: UiMessage[] = (snap.messages || [])
+          .filter((m: any) => m.role === "user" || m.role === "assistant")
+          .filter((m: any) => (m.content || "").trim().length > 0)
+          .map((m: any) => ({ id: nowId(), role: m.role, content: m.content }));
+        setMessages(msgs);
+      } catch {}
+    })();
   }, [currentId]);
 
-  useEffect(() => {
-    // auto-scroll on new session change
-    scrollToBottom(false);
-  }, [currentId, scrollToBottom]);
+  React.useEffect(() => {
+    // Autoscroll on new content
+    const el = scrollRef.current;
+    if (!el) return;
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 200;
+    if (near) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  }, [messages]);
 
-  // ── Actions ──────────────────────────────────────────────
-  const createSession = useCallback(() => {
-    const s = newSession(model, thinking);
-    setSessions(prev => [s, ...prev]);
-    setCurrentId(s.id);
-    setSidebarOpen(false);
-    setTimeout(() => textareaRef.current?.focus(), 0);
-  }, [model, thinking]);
-
-  const upsertMessage = useCallback((sessionId: string, msg: Message) => {
-    setSessions(prev => prev.map(s => {
-      if (s.id !== sessionId) return s;
-      const idx = s.messages.findIndex(m => m.id === msg.id);
-      const messages = idx === -1
-        ? [...s.messages, msg]
-        : s.messages.map(m => m.id === msg.id ? msg : m);
-      return { ...s, messages, updatedAt: Date.now() };
-    }));
+  const newSession = React.useCallback(async () => {
+    try {
+      const r = await fetch("/api/sessions", { method: "POST" });
+      const j = await r.json();
+      if (j.error) { setError(j.error); return; }
+      setSessions(prev => [j.session, ...prev.filter(s => s.id !== j.session.id)]);
+      setCurrentId(j.session.id);
+      setMessages([]);
+      setDrawerOpen(false);
+      setTimeout(() => inputRef.current?.focus(), 0);
+    } catch (e: any) {
+      setError(String(e?.message ?? e));
+    }
   }, []);
 
-  const patchMessage = useCallback((sessionId: string, msgId: string, patch: Partial<Message>) => {
-    setSessions(prev => prev.map(s => {
-      if (s.id !== sessionId) return s;
-      const messages = s.messages.map(m => m.id === msgId ? { ...m, ...patch } : m);
-      return { ...s, messages, updatedAt: Date.now() };
-    }));
-  }, []);
-
-  const sendMessage = useCallback(async (text: string) => {
-    let sess = current;
-    if (!sess) {
-      const s = newSession(model, thinking);
-      setSessions(prev => [s, ...prev]);
-      setCurrentId(s.id);
-      sess = s;
+  const sendMessage = React.useCallback(async (text: string) => {
+    let sid = currentId;
+    if (!sid) {
+      // Auto-create a session
+      const r = await fetch("/api/sessions", { method: "POST" });
+      const j = await r.json();
+      if (j.error) { setError(j.error); return; }
+      sid = j.session.id as string;
+      setSessions(prev => [j.session, ...prev.filter(s => s.id !== sid)]);
+      setCurrentId(sid);
     }
 
-    const userMsg = newMessage("user", text);
-    const assistantMsg = newMessage("assistant", "", { streaming: true });
-    let thinkingMsg: Message | null = null;
-    if (thinking !== "off" && showThinking) {
-      thinkingMsg = newMessage("thinking", "", { streaming: true });
-    }
-
-    const sessionId = sess.id;
-    setSessions(prev => prev.map(s => {
-      if (s.id !== sessionId) return s;
-      const isFirst = s.messages.length === 0;
-      const added: Message[] = [userMsg];
-      if (thinkingMsg) added.push(thinkingMsg);
-      added.push(assistantMsg);
-      return {
-        ...s,
-        title: isFirst ? titleFrom(text) : s.title,
-        messages: [...s.messages, ...added],
-        updatedAt: Date.now(),
-      };
-    }));
-
+    const userMsg: UiMessage = { id: nowId(), role: "user", content: text };
+    const assistantMsg: UiMessage = { id: nowId(), role: "assistant", content: "", streaming: true };
+    setMessages(prev => [...prev, userMsg, assistantMsg]);
     setStreaming(true);
+
     const ac = new AbortController();
     abortRef.current = ac;
-
-    const history = [...(sess.messages || []), userMsg]
-      .filter(m => m.role === "user" || m.role === "assistant")
-      .map(m => ({ role: m.role, content: m.content }));
 
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history, model, thinking }),
+        body: JSON.stringify({ sessionId: sid, message: text }),
         signal: ac.signal,
       });
-      if (!res.ok || !res.body) throw new Error("Bad response");
+      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = "";
-      let assistantText = "";
-      let thinkingText = "";
-      let stage: "thinking" | "answer" = thinkingMsg ? "thinking" : "answer";
+
+      // Currently open tool cards, keyed by tool call id
+      const openTools = new Map<string, string>(); // toolCallId -> uiMessageId
 
       while (true) {
         const { done, value } = await reader.read();
@@ -180,360 +149,315 @@ export default function Home() {
         buf += dec.decode(value, { stream: true });
         let idx;
         while ((idx = buf.indexOf("\n\n")) !== -1) {
-          const evt = buf.slice(0, idx);
+          const line = buf.slice(0, idx);
           buf = buf.slice(idx + 2);
-          const line = evt.split("\n").find(l => l.startsWith("data: "));
-          if (!line) continue;
-          try {
-            const data = JSON.parse(line.slice(6));
-            if (data.type === "thinking" && thinkingMsg) {
-              thinkingText += data.delta;
-              patchMessage(sessionId, thinkingMsg.id, { content: thinkingText });
-            } else if (data.type === "thinking_end" && thinkingMsg) {
-              patchMessage(sessionId, thinkingMsg.id, { streaming: false });
-              stage = "answer";
-            } else if (data.type === "delta") {
-              assistantText += data.delta;
-              patchMessage(sessionId, assistantMsg.id, { content: assistantText });
-              if (messagesRef.current) {
-                const el = messagesRef.current;
-                const near = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
-                if (near) scrollToBottom(false);
-                else setNewMsgBadge(true);
-              }
-            } else if (data.type === "done") {
-              patchMessage(sessionId, assistantMsg.id, { streaming: false });
-            }
-          } catch { /* ignore */ }
+          const dl = line.split("\n").find(l => l.startsWith("data: "));
+          if (!dl) continue;
+          let evt: StreamEvent;
+          try { evt = JSON.parse(dl.slice(6)); } catch { continue; }
+          applyEvent(evt, assistantMsg.id, openTools);
         }
       }
-      patchMessage(sessionId, assistantMsg.id, { streaming: false });
-      if (thinkingMsg) patchMessage(sessionId, thinkingMsg.id, { streaming: false });
     } catch (e: any) {
-      if (e?.name === "AbortError") {
-        patchMessage(sessionId, assistantMsg.id, {
-          content: (assistantMsg.content || "") + "\n\n_(aborted)_",
-          streaming: false,
-        });
+      if (e?.name !== "AbortError") {
+        setMessages(prev => prev.map(m =>
+          m.id === assistantMsg.id ? { ...m, content: (m.content || "") + `\n\n**Error:** ${e?.message ?? e}`, streaming: false } : m
+        ));
       } else {
-        patchMessage(sessionId, assistantMsg.id, {
-          content: "Error: " + (e?.message ?? "unknown"),
-          streaming: false,
-        });
+        setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, streaming: false } : m));
       }
     } finally {
       setStreaming(false);
       abortRef.current = null;
+      // Refresh titles from server (first message sets it)
+      void refresh();
     }
-  }, [current, model, thinking, showThinking, patchMessage, scrollToBottom]);
 
-  // Drain queued messages once streaming ends
-  useEffect(() => {
-    if (streaming) return;
-    if (queued.length === 0) return;
-    const [next, ...rest] = queued;
-    setQueued(rest);
-    void sendMessage(next);
-  }, [streaming, queued, sendMessage]);
+    function applyEvent(evt: StreamEvent, assistantId: string, openTools: Map<string, string>) {
+      switch (evt.type) {
+        case "delta":
+          if (evt.delta) {
+            setMessages(prev => prev.map(m =>
+              m.id === assistantId ? { ...m, content: (m.content || "") + evt.delta! } : m
+            ));
+          }
+          break;
+        case "tool_start": {
+          const uiId = nowId();
+          if (evt.id) openTools.set(evt.id, uiId);
+          setMessages(prev => {
+            // Insert tool card *after* the current assistant streaming msg to keep order
+            const idx = prev.findIndex(m => m.id === assistantId);
+            const toolMsg: UiMessage = {
+              id: uiId, role: "tool",
+              content: "",
+              toolName: evt.name ?? "tool",
+              toolInput: evt.input,
+              streaming: true,
+            };
+            // Close current assistant text bubble so next text starts fresh
+            const newAssistant: UiMessage = { id: nowId(), role: "assistant", content: "", streaming: true };
+            const before = prev.slice(0, idx + 1);
+            const after = prev.slice(idx + 1);
+            return [
+              ...before.map(m => m.id === assistantId ? { ...m, streaming: false } : m),
+              toolMsg,
+              newAssistant,
+              ...after,
+            ];
+          });
+          break;
+        }
+        case "tool_end": {
+          const uiId = evt.id ? openTools.get(evt.id) : undefined;
+          if (!uiId) break;
+          setMessages(prev => prev.map(m =>
+            m.id === uiId ? { ...m, toolOutput: evt.output ?? "", toolError: !!evt.isError, streaming: false } : m
+          ));
+          break;
+        }
+        case "error":
+          setMessages(prev => prev.map(m =>
+            m.streaming ? { ...m, content: (m.content || "") + `\n\n**Error:** ${evt.message}`, streaming: false } : m
+          ));
+          break;
+        case "done":
+          setMessages(prev => prev.map(m => m.streaming ? { ...m, streaming: false } : m));
+          break;
+        default: break;
+      }
+    }
+  }, [currentId, refresh]);
 
-  const onSubmit = useCallback((e: React.FormEvent) => {
-    e.preventDefault();
-    const text = input.trim();
-    if (!text) return;
+  const onSend = () => {
+    const t = input.trim();
+    if (!t || streaming) return;
     setInput("");
-    if (streaming) {
-      setQueued(q => [...q, text]);
-    } else {
-      void sendMessage(text);
-    }
-  }, [input, streaming, sendMessage]);
+    void sendMessage(t);
+  };
 
-  const abort = useCallback(() => {
+  const onAbort = async () => {
+    if (!currentId) return;
     abortRef.current?.abort();
-  }, []);
+    try { await fetch("/api/abort", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId: currentId }) }); } catch {}
+  };
 
-  // ── Keyboard shortcuts ───────────────────────────────────
-  useEffect(() => {
+  // Keyboard shortcuts
+  React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      const inField = document.activeElement instanceof HTMLInputElement
-        || document.activeElement instanceof HTMLTextAreaElement;
-      if (e.key === "Escape") {
-        if (streaming) { abort(); e.preventDefault(); }
-        else if (settingsOpen) { setSettingsOpen(false); }
-      }
-      if (e.key === "/" && !inField) {
-        textareaRef.current?.focus();
-        e.preventDefault();
-      }
+      if (e.key === "Escape" && streaming) { onAbort(); }
+      const inField = document.activeElement?.tagName === "INPUT" || document.activeElement?.tagName === "TEXTAREA";
+      if ((e.metaKey || e.ctrlKey) && e.key === "n") { e.preventDefault(); void newSession(); }
+      if (e.key === "/" && !inField) { e.preventDefault(); inputRef.current?.focus(); }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [streaming, abort, settingsOpen]);
+  }, [streaming, newSession, onAbort]);
 
-  // ── Voice input (Web Speech API) ─────────────────────────
-  const toggleMic = useCallback(() => {
-    const W = window as any;
-    const Rec = W.SpeechRecognition || W.webkitSpeechRecognition;
-    if (!Rec) { alert("Web Speech API not supported in this browser"); return; }
-    if (recogRef.current && micOn) {
-      recogRef.current.stop();
-      setMicOn(false);
-      return;
-    }
-    const rec = new Rec();
-    rec.continuous = true;
-    rec.interimResults = true;
-    rec.lang = "en-US";
-    let base = input;
-    rec.onresult = (e: any) => {
-      let transcript = "";
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        transcript += e.results[i][0].transcript;
-      }
-      setInput((base + " " + transcript).trim());
-    };
-    rec.onend = () => setMicOn(false);
-    rec.onerror = () => setMicOn(false);
-    recogRef.current = rec;
-    rec.start();
-    setMicOn(true);
-  }, [micOn, input]);
-
-  // ── Token/cost demo values ───────────────────────────────
-  const totalTokens = current
-    ? current.messages.reduce((n, m) => n + Math.ceil(m.content.length / 4), 0)
-    : 0;
-  const ctxMax = 200_000;
-  const usedPct = Math.min(100, Math.round((totalTokens / ctxMax) * 100));
-  const estCost = (totalTokens / 1000 * 0.003).toFixed(4);
-
-  // ── Handlers for children ────────────────────────────────
-  const cycleThinking = () => {
-    const i = THINKING_LEVELS.indexOf(thinking);
-    setThinking(THINKING_LEVELS[(i + 1) % THINKING_LEVELS.length]);
-  };
-  const copyText = (t: string) => navigator.clipboard?.writeText(t).catch(() => {});
-  const deleteMessage = (id: string) => {
-    if (!current) return;
-    setSessions(prev => prev.map(s =>
-      s.id !== current.id ? s : { ...s, messages: s.messages.filter(m => m.id !== id) }
-    ));
-  };
+  const sidebar = (
+    <Box sx={{ width: SIDEBAR_WIDTH, height: "100%", display: "flex", flexDirection: "column", bgcolor: "background.paper" }}>
+      <Toolbar variant="dense" sx={{ px: 2, gap: 1, minHeight: 52 }}>
+        <Typography variant="body2" sx={{ flex: 1, fontWeight: 600, letterSpacing: "-0.01em" }}>
+          Chats
+        </Typography>
+        <Tooltip title="Refresh">
+          <IconButton onClick={refresh}><RefreshIcon fontSize="small" /></IconButton>
+        </Tooltip>
+        <Tooltip title="New chat (⌘N)">
+          <IconButton onClick={newSession}><AddIcon fontSize="small" /></IconButton>
+        </Tooltip>
+      </Toolbar>
+      <Divider />
+      <Box sx={{ flex: 1, overflowY: "auto", py: 1 }}>
+        {loadingList && sessions.length === 0 && (
+          <Box sx={{ px: 3, py: 4, textAlign: "center", color: "text.secondary" }}>
+            <CircularProgress size={16} />
+          </Box>
+        )}
+        {!loadingList && sessions.length === 0 && (
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", px: 3, py: 2 }}>
+            No chats yet. Press <b>+</b> to start.
+          </Typography>
+        )}
+        <List dense disablePadding>
+          {sessions.map(s => (
+            <ListItemButton
+              key={s.id}
+              selected={s.id === currentId}
+              onClick={() => { setCurrentId(s.id); setDrawerOpen(false); }}
+            >
+              <ListItemText
+                primary={s.title}
+                primaryTypographyProps={{ noWrap: true, variant: "body2" }}
+                secondary={new Date(s.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                secondaryTypographyProps={{ variant: "caption" }}
+              />
+            </ListItemButton>
+          ))}
+        </List>
+      </Box>
+      <Divider />
+      <Box sx={{ px: 2, py: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
+        <Typography variant="caption" color="text.secondary" sx={{ flex: 1 }}>
+          real pi
+        </Typography>
+        <IconButton onClick={() => setMode(mode === "dark" ? "light" : "dark")}>
+          {mode === "dark" ? <LightModeIcon fontSize="small" /> : <DarkModeIcon fontSize="small" />}
+        </IconButton>
+      </Box>
+    </Box>
+  );
 
   return (
-    <div className="app-layout">
-      <SessionSidebar
-        sessions={sessions}
-        currentId={currentId}
-        onSelect={setCurrentId}
-        onNew={createSession}
-        onRefresh={() => setSessions(loadSessions())}
-        search={search}
-        onSearch={setSearch}
-        open={sidebarOpen}
-        onCloseMobile={() => setSidebarOpen(false)}
-      />
+    <Box sx={{ display: "flex", height: "100dvh", bgcolor: "background.default" }}>
+      {isMobile ? (
+        <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} PaperProps={{ sx: { border: 0 } }}>
+          {sidebar}
+        </Drawer>
+      ) : (
+        <Box sx={{ borderRight: 1, borderColor: "divider", flexShrink: 0 }}>
+          {sidebar}
+        </Box>
+      )}
 
-      <div className="main">
-        <div className="header">
-          <div className="header-left">
-            <button className="sidebar-toggle" onClick={() => setSidebarOpen(o => !o)} title="Toggle sidebar">
-              <IconMenu />
-            </button>
-            <ModelDropdown value={model} onChange={setModel} />
-            <button className="thinking-tag" onClick={cycleThinking} title="Cycle thinking level">
-              {thinking}
-            </button>
-          </div>
-          <div className="header-right">
-            <div className="pill session-cost" title="Session cost">${estCost}</div>
-            <div className="pill token-usage" title="Context usage">
-              {totalTokens.toLocaleString()} / {ctxMax.toLocaleString()} · {usedPct}%
-            </div>
-            <div className="status">
-              <span className="status-indicator connected" />
-              <span className="status-text">Ready</span>
-            </div>
-            <button className="icon-btn" title="Files" onClick={() => setFileOpen(o => !o)}>
-              <IconFolder />
-            </button>
-            <button className="settings-btn" title="Settings" onClick={() => setSettingsOpen(true)}>
-              <IconSettings />
-            </button>
-          </div>
-        </div>
-
-        <div className="messages" ref={messagesRef}>
-          {(!current || current.messages.length === 0) && (
-            <div className="welcome">
-              <div className="welcome-icon">
-                <Image src="/icons/tau-192.png" alt="τ" width={64} height={64} className="tau-icon-welcome" />
-              </div>
-              <p>Welcome to ChatUI</p>
-              <p className="hint">Type a message below to start chatting, or select a session from the sidebar.</p>
-              <div className="shortcuts-hint">
-                <span>/ Focus input</span>
-                <span>Esc Abort</span>
-                <span>Shift+Enter Newline</span>
-              </div>
-            </div>
-          )}
-
-          {current?.messages.map(m => (
-            <MessageView
-              key={m.id}
-              m={m}
-              showThinking={showThinking}
-              onCopy={copyText}
-              onDelete={deleteMessage}
-            />
-          ))}
-        </div>
-
-        {scrollBtn && (
-          <button className="scroll-bottom-btn" onClick={() => scrollToBottom(true)}>
-            {newMsgBadge && (
-              <span className="scroll-bottom-badge">
-                New <IconArrowDown size={10} />
-              </span>
+      <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+        <AppBar position="static">
+          <Toolbar variant="dense" sx={{ gap: 1, minHeight: 52, borderBottom: 1, borderColor: "divider" }}>
+            {isMobile && (
+              <IconButton onClick={() => setDrawerOpen(true)}><MenuIcon fontSize="small" /></IconButton>
             )}
-            <span className="scroll-bottom-icon"><IconArrowDown /></span>
-          </button>
-        )}
+            <Typography variant="body2" color="text.secondary" sx={{ flex: 1 }} noWrap>
+              {sessions.find(s => s.id === currentId)?.title ?? "ChatUI"}
+            </Typography>
+            {streaming && (
+              <Stack direction="row" spacing={1} alignItems="center">
+                <CircularProgress size={12} />
+                <Typography variant="caption" color="text.secondary">thinking…</Typography>
+              </Stack>
+            )}
+          </Toolbar>
+        </AppBar>
 
-        <div className="input-area">
-          {queued.length > 0 && (
-            <div className="queued-messages">
-              {queued.map((q, i) => (
-                <div key={i} className="queued-message">
-                  <span>{q}</span>
-                  <button onClick={() => setQueued(qs => qs.filter((_, j) => j !== i))}>
-                    <IconClose size={12} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-          <form onSubmit={onSubmit}>
-            <div className="input-left-actions">
-              <button type="button" className="input-icon-btn" title="Commands" tabIndex={-1}
-                onClick={() => alert("Slash commands: /new, /clear, /theme — hook up here")}>
-                <IconCommand />
-              </button>
-              <button type="button" className="input-icon-btn" title="Attach image" tabIndex={-1}
-                onClick={() => alert("Image attach demo — wire to real upload here")}>
-                <IconAttach />
-              </button>
-            </div>
-            <div className="input-bubble">
-              <textarea
-                ref={textareaRef}
-                value={input}
-                onChange={e => setInput(e.target.value)}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    onSubmit(e as any);
-                  }
-                }}
-                placeholder={streaming ? "Message will be queued…" : "Type a message… (Enter to send, Shift+Enter for newline)"}
-                rows={2}
-                autoComplete="off"
-              />
-              <button
-                type="button"
-                className={"input-mic-btn" + (micOn ? " recording" : "")}
-                title="Voice input"
-                tabIndex={-1}
-                onClick={toggleMic}
-              >
-                <IconMic />
-              </button>
-            </div>
-            <div className="input-actions">
-              {!streaming ? (
-                <button type="submit" id="send-btn" title="Send message" tabIndex={-1}>
-                  <span className="send-icon"><IconSend /></span>
-                </button>
-              ) : (
-                <button type="button" id="abort-btn" title="Abort (Esc)" onClick={abort} tabIndex={-1}>
-                  <IconStop />
-                </button>
-              )}
-            </div>
-          </form>
-        </div>
-      </div>
+        <Box ref={scrollRef} sx={{ flex: 1, overflowY: "auto", px: { xs: 2, md: 4 }, py: 3 }}>
+          <Box sx={{ maxWidth: 780, mx: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
+            {messages.length === 0 && (
+              <Box sx={{ textAlign: "center", color: "text.secondary", py: 8 }}>
+                <Typography variant="h6" sx={{ mb: 1, fontWeight: 500 }}>ChatUI</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Talk to a real Pi agent session, in your browser.
+                </Typography>
+                <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 2 }}>
+                  cwd: <code>{typeof window !== "undefined" ? "" : ""}pi from server</code> · press <kbd>/</kbd> to focus, <kbd>Esc</kbd> to abort
+                </Typography>
+              </Box>
+            )}
 
-      <FileBrowser
-        open={fileOpen}
-        onClose={() => setFileOpen(false)}
-        onInsertPath={p => {
-          setInput(v => v + (v ? " " : "") + p);
-          textareaRef.current?.focus();
-        }}
-      />
+            {messages.map(m => (
+              <MessageRow key={m.id} m={m} />
+            ))}
+            {error && (
+              <Paper variant="outlined" sx={{ p: 1.5, borderColor: "error.main", color: "error.main" }}>
+                <Typography variant="body2">{error}</Typography>
+              </Paper>
+            )}
+          </Box>
+        </Box>
 
-      <Settings
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        themeId={themeId}
-        setThemeId={setThemeId}
-        thinking={thinking}
-        setThinking={setThinking}
-        showThinking={showThinking}
-        setShowThinking={setShowThinking}
-        autoCompact={autoCompact}
-        setAutoCompact={setAutoCompact}
-      />
-    </div>
+        <Box sx={{ borderTop: 1, borderColor: "divider", px: { xs: 2, md: 4 }, py: 1.5 }}>
+          <Paper
+            variant="outlined"
+            sx={{
+              maxWidth: 780,
+              mx: "auto",
+              px: 1.5, py: 0.5,
+              display: "flex",
+              alignItems: "flex-end",
+              gap: 1,
+              borderRadius: 3,
+            }}
+          >
+            <InputBase
+              inputRef={inputRef}
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); onSend(); }
+              }}
+              placeholder={streaming ? "Streaming…" : "Message Pi"}
+              multiline
+              minRows={1}
+              maxRows={10}
+              sx={{ flex: 1, fontSize: 14, py: 1 }}
+              disabled={false}
+            />
+            {streaming ? (
+              <Tooltip title="Stop (Esc)">
+                <IconButton onClick={onAbort} sx={{ mb: 0.5 }}>
+                  <StopIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            ) : (
+              <Tooltip title="Send (Enter)">
+                <span>
+                  <IconButton
+                    onClick={onSend}
+                    disabled={!input.trim()}
+                    sx={{
+                      mb: 0.5,
+                      bgcolor: input.trim() ? "text.primary" : "transparent",
+                      color: input.trim() ? "background.paper" : "text.disabled",
+                      "&:hover": { bgcolor: input.trim() ? "text.primary" : "transparent", opacity: 0.85 },
+                    }}
+                  >
+                    <SendIcon fontSize="small" />
+                  </IconButton>
+                </span>
+              </Tooltip>
+            )}
+          </Paper>
+        </Box>
+      </Box>
+    </Box>
   );
 }
 
-function MessageView({
-  m, showThinking, onCopy, onDelete,
-}: {
-  m: Message;
-  showThinking: boolean;
-  onCopy: (t: string) => void;
-  onDelete: (id: string) => void;
-}) {
-  if (m.role === "thinking") {
-    if (!showThinking) return null;
+function MessageRow({ m }: { m: UiMessage }) {
+  if (m.role === "tool") {
     return (
-      <div className="message thinking">
-        <div className="message-label">Thinking</div>
-        <div className="message-content">
-          {m.content || (m.streaming ? "…" : "")}
-          {m.streaming && <span className="typing-dot" />}
-        </div>
-      </div>
+      <ToolCard
+        name={m.toolName ?? "tool"}
+        input={m.toolInput}
+        output={m.toolOutput}
+        error={m.toolError}
+        running={m.streaming}
+      />
     );
   }
-
   if (m.role === "user") {
     return (
-      <div className="message user">
-        <div className="message-actions">
-          <button className="msg-action" title="Copy" onClick={() => onCopy(m.content)}><IconCopy /></button>
-          <button className="msg-action" title="Delete" onClick={() => onDelete(m.id)}><IconClose size={12} /></button>
-        </div>
-        <div className="message-content">
-          <Markdown>{m.content}</Markdown>
-        </div>
-      </div>
+      <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+        <Paper
+          variant="outlined"
+          sx={{
+            px: 2, py: 1.25,
+            maxWidth: "80%",
+            borderRadius: 3,
+            bgcolor: (t) => t.palette.mode === "dark" ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+          }}
+        >
+          <Typography variant="body2" sx={{ whiteSpace: "pre-wrap" }}>{m.content}</Typography>
+        </Paper>
+      </Box>
     );
   }
-
+  // assistant
+  if (!m.content && !m.streaming) return null;
   return (
-    <div className="message assistant">
-      <div className="message-actions">
-        <button className="msg-action" title="Copy" onClick={() => onCopy(m.content)}><IconCopy /></button>
-      </div>
-      <div className="message-content">
+    <Box sx={{ pl: 0.5 }}>
+      <div className="md">
         {m.content ? <Markdown>{m.content}</Markdown> : null}
-        {m.streaming && <span className="typing-dot" />}
+        {m.streaming && <span className="cursor" />}
       </div>
-    </div>
+    </Box>
   );
 }
