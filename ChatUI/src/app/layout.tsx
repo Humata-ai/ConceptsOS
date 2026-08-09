@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import KeyboardInsets from "@/components/KeyboardInsets";
 import ThemeRegistry from "@/components/ThemeRegistry";
 import "./globals.css";
 
@@ -26,7 +25,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
-        <KeyboardInsets />
         <ThemeRegistry>{children}</ThemeRegistry>
       </body>
     </html>

@@ -1,19 +1,12 @@
 html, body {
-  margin: 0;
   height: 100dvh;
-  width: 100%;
+  margin: 0;
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
 }
-/* Pin the document so iOS Safari can't scroll the layout viewport when an
-   input is focused (which is what pushes the fixed header off-screen). */
-html, body {
-  position: fixed;
-  top: 0;
-  left: 0;
-}
-body { -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; }
-pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+pre, code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+}
 pre { margin: 0; white-space: pre-wrap; word-break: break-word; }

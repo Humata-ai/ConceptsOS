@@ -312,19 +312,10 @@ export default function Page() {
     <Box
       sx={{
         display: "flex",
-        // Pin the app to the current window.visualViewport rectangle. When the
-        // iOS keyboard opens Safari may either shrink the layout (interactive-
-        // widget=resizes-content) or scroll the visual viewport within an
-        // unchanged layout — this handles both:
-        //   top    = visualViewport.offsetTop   (0 in the resize case)
-        //   height = visualViewport.height      (== 100dvh when no keyboard)
-        position: "fixed",
-        left: 0,
-        right: 0,
-        top: "var(--vv-offset-top, 0px)",
-        height: "var(--vv-height, 100dvh)",
-        bgcolor: "background.default",
+        height: "100dvh",
+        width: "100%",
         overflow: "hidden",
+        bgcolor: "background.default",
       }}
     >
       {/* Desktop sidebar */}
