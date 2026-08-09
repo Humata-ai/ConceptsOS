@@ -4,7 +4,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "ChatUI",
-  description: "Pi agent over the tailnet",
+  description: "Chat over the tailnet",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "ChatUI", statusBarStyle: "default" },
 };

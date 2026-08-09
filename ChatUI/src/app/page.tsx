@@ -24,6 +24,7 @@ import DarkIcon from "@mui/icons-material/DarkMode";
 import LightIcon from "@mui/icons-material/LightMode";
 import { ColorModeContext } from "@/components/ThemeRegistry";
 import ToolCard from "@/components/ToolCard";
+import Markdown from "@/components/Markdown";
 import type { ChatEvent, SessionSummary, UiMessage, UiToolCall } from "@/lib/types";
 
 const DRAWER_WIDTH = 280;
@@ -308,7 +309,15 @@ export default function Page() {
   );
 
   return (
-    <Box sx={{ display: "flex", height: "100dvh", bgcolor: "background.default" }}>
+    <Box
+      sx={{
+        display: "flex",
+        position: "fixed",
+        inset: 0,
+        height: "100dvh",
+        bgcolor: "background.default",
+      }}
+    >
       {/* Desktop sidebar */}
       <Drawer
         variant="permanent"
@@ -371,7 +380,7 @@ export default function Page() {
           <Box sx={{ maxWidth: 780, mx: "auto" }}>
             {activeChat.messages.length === 0 && (
               <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
-                Ask Pi anything.
+                Ask anything.
               </Typography>
             )}
             <Stack spacing={2}>
@@ -400,7 +409,7 @@ export default function Page() {
               multiline
               maxRows={8}
               value={input}
-              placeholder="Message Pi…"
+              placeholder="Send a message…"
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -408,7 +417,7 @@ export default function Page() {
                   if (!streaming) send();
                 }
               }}
-              sx={{ flex: 1, fontSize: 15 }}
+              sx={{ flex: 1, fontSize: 16 }}
             />
             {streaming ? (
               <IconButton color="primary" onClick={abort} aria-label="stop">
@@ -461,19 +470,7 @@ function MessageView({ message }: { message: UiMessage }) {
             {message.toolCalls.map((t) => (
               <ToolCard key={t.id} tool={t} />
             ))}
-            {message.text && (
-              <Typography
-                component="pre"
-                sx={{
-                  whiteSpace: "pre-wrap",
-                  fontSize: 15,
-                  lineHeight: 1.55,
-                  fontFamily: "inherit",
-                }}
-              >
-                {message.text}
-              </Typography>
-            )}
+            {message.text && <Markdown>{message.text}</Markdown>}
           </Box>
         )}
       </Box>
