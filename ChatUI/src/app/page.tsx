@@ -345,9 +345,14 @@ export default function Page() {
 
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <AppBar
-          position="static"
+          position="sticky"
           color="transparent"
           sx={{
+            top: 0,
+            // iOS Safari needs the -webkit prefix; MUI emits position: sticky
+            // via the prop, so belt-and-braces with an inline override too.
+            position: ["-webkit-sticky", "sticky"] as unknown as "sticky",
+            zIndex: (t) => t.zIndex.appBar,
             borderBottom: (t) => `1px solid ${t.palette.divider}`,
             bgcolor: "background.default",
           }}
