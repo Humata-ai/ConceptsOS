@@ -37,7 +37,7 @@
         <string>UIInterfaceOrientationLandscapeLeft</string>
         <string>UIInterfaceOrientationLandscapeRight</string>
     </array>
-    <!-- Allow the app to talk to http://192.168.1.230:3000 (plaintext, private LAN). -->
+    <!-- Allow the app to talk to http://10.10.0.1:3000 (plaintext, private LAN). -->
     <key>NSAppTransportSecurity</key>
     <dict>
         <key>NSAllowsArbitraryLoads</key>
@@ -46,7 +46,7 @@
         <true/>
         <key>NSExceptionDomains</key>
         <dict>
-            <key>192.168.1.230</key>
+            <key>10.10.0.1</key>
             <dict>
                 <key>NSExceptionAllowsInsecureHTTPLoads</key>
                 <true/>
