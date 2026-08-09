@@ -313,8 +313,10 @@ export default function Page() {
       sx={{
         display: "flex",
         position: "fixed",
-        inset: 0,
-        height: "100dvh",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: "var(--app-height, 100dvh)",
         bgcolor: "background.default",
       }}
     >

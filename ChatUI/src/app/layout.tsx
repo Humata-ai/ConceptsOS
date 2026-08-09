@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import ThemeRegistry from "@/components/ThemeRegistry";
+import ViewportHeight from "@/components/ViewportHeight";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -13,6 +14,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  interactiveWidget: "resizes-content",
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fafafa" },
     { media: "(prefers-color-scheme: dark)", color: "#0b0b0c" },
@@ -23,6 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body>
+        <ViewportHeight />
         <ThemeRegistry>{children}</ThemeRegistry>
       </body>
     </html>

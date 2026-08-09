@@ -1,4 +1,6 @@
+:root { --app-height: 100dvh; }
 html, body { height: 100%; margin: 0; overflow: hidden; overscroll-behavior: none; }
+html, body { position: fixed; inset: 0; width: 100%; }
 body { -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; }
 pre, code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
