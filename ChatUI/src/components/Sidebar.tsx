@@ -1,5 +1,6 @@
 "use client";
 
+import { memo, useCallback } from "react";
 import Box from "@mui/material/Box";
 import Divider from "@mui/material/Divider";
 import IconButton from "@mui/material/IconButton";
@@ -25,7 +26,61 @@ type Props = {
   onToggleTheme: () => void;
 };
 
-export default function Sidebar({
+/**
+ * One row. Memoized on (session, active, callbacks) so typing in the
+ * message input — which re-renders <Page> — doesn't re-render 767 rows.
+ * The callbacks are stable by construction (useCallback in the parent
+ * that owns state) so the memo is effectively keyed on the session
+ * object and the `active` boolean.
+ */
+const SidebarRow = memo(function SidebarRow({
+  session,
+  active,
+  onSelect,
+  onDelete,
+}: {
+  session: SessionSummary;
+  active: boolean;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+}) {
+  const handleClick = useCallback(
+    () => onSelect(session.id),
+    [onSelect, session.id],
+  );
+  const handleDelete = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      onDelete(session.id);
+    },
+    [onDelete, session.id],
+  );
+  return (
+    <ListItemButton
+      selected={active}
+      onClick={handleClick}
+      sx={{ mx: 1, my: 0.25 }}
+    >
+      <ListItemText
+        primary={session.title}
+        primaryTypographyProps={{
+          noWrap: true,
+          fontSize: 13,
+          fontWeight: active ? 600 : 400,
+        }}
+      />
+      <IconButton
+        size="small"
+        onClick={handleDelete}
+        sx={{ opacity: 0.5, "&:hover": { opacity: 1 } }}
+      >
+        <DeleteIcon fontSize="inherit" />
+      </IconButton>
+    </ListItemButton>
+  );
+});
+
+function SidebarImpl({
   width,
   sessions,
   activeId,
@@ -46,31 +101,13 @@ export default function Sidebar({
       <Divider />
       <List sx={{ flex: 1, overflowY: "auto", py: 0.5 }} dense>
         {sessions.map((s) => (
-          <ListItemButton
+          <SidebarRow
             key={s.id}
-            selected={s.id === activeId}
-            onClick={() => onSelect(s.id)}
-            sx={{ mx: 1, my: 0.25 }}
-          >
-            <ListItemText
-              primary={s.title}
-              primaryTypographyProps={{
-                noWrap: true,
-                fontSize: 13,
-                fontWeight: s.id === activeId ? 600 : 400,
-              }}
-            />
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(s.id);
-              }}
-              sx={{ opacity: 0.5, "&:hover": { opacity: 1 } }}
-            >
-              <DeleteIcon fontSize="inherit" />
-            </IconButton>
-          </ListItemButton>
+            session={s}
+            active={s.id === activeId}
+            onSelect={onSelect}
+            onDelete={onDelete}
+          />
         ))}
       </List>
       <Divider />
@@ -85,3 +122,11 @@ export default function Sidebar({
     </Box>
   );
 }
+
+/**
+ * Memoized so keystrokes in <Page>'s message input don't re-render the
+ * sidebar (which owns ~hundreds of DOM nodes). Callbacks passed in are
+ * expected to be stable via useCallback in the parent.
+ */
+const Sidebar = memo(SidebarImpl);
+export default Sidebar;

@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import Box from "@mui/material/Box";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
@@ -10,7 +11,7 @@ import ToolCard from "./ToolCard";
 import TypingIndicator from "./TypingIndicator";
 import type { UiMessage } from "@/lib/types";
 
-export default function MessageView({ message }: { message: UiMessage }) {
+function MessageViewImpl({ message }: { message: UiMessage }) {
   const isUser = message.role === "user";
   const streaming = !!message.streaming;
   const thinkingActive = streaming && !!message.thinking && !message.text;
@@ -81,3 +82,12 @@ export default function MessageView({ message }: { message: UiMessage }) {
     </Box>
   );
 }
+
+/**
+ * Memoized so that streaming a new assistant token doesn't force every
+ * historical <MessageView> in the list to re-render. Since UiMessages are
+ * treated as immutable (chatReducer returns new objects on mutation),
+ * default reference equality is exactly what we want.
+ */
+const MessageView = memo(MessageViewImpl);
+export default MessageView;
