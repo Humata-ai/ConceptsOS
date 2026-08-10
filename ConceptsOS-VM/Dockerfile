@@ -9,21 +9,25 @@
 # app binds to the tunnel interface).
 
 # --- deps: install node_modules ---------------------------------------------
-FROM node:20-bookworm-slim AS deps
+FROM node:22-bookworm-slim AS deps
 WORKDIR /app
-COPY app/package.json ./
+# `npm ci` doesn't work here: @earendil-works/pi-coding-agent ships its own
+# npm-shrinkwrap.json, and its nested entries in the root lockfile lack
+# `resolved`/`integrity` fields (they're provided by the child shrinkwrap at
+# install time). `npm install` handles that composition correctly.
+COPY AgentChat/package.json AgentChat/package-lock.json ./
 RUN npm install --no-audit --no-fund
 
 # --- builder: build Next.js standalone output -------------------------------
-FROM node:20-bookworm-slim AS builder
+FROM node:22-bookworm-slim AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
-COPY app/ ./
+COPY AgentChat/ ./
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 
 # --- runtime: node + wireguard-tools ----------------------------------------
-FROM node:20-bookworm-slim AS runner
+FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production \
