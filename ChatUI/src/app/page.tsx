@@ -44,6 +44,13 @@ const iOS =
 export default function Page() {
   const { mode, toggle } = useContext(ColorModeContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // When the user swipes the drawer open via useGlobalSwipeToOpen, we've
+  // already animated the paper to translateX(0) ourselves. We need MUI's
+  // Slide to *skip* its own enter animation on this specific state change,
+  // otherwise it would forcibly reset the paper to translateX(-100%) via
+  // its handleEnter callback and slide it in again — producing the "opens
+  // too fast" artifact where the drawer detaches from the finger.
+  const [slideEnter, setSlideEnter] = useState(true);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [chats, setChats] = useState<Record<string, ChatState>>({});
@@ -59,10 +66,27 @@ export default function Page() {
   // paper to track the finger, then handing off to MUI's Slide transition
   // on release for the last few pixels.
   useGlobalSwipeToOpen({
-    onOpen: () => setDrawerOpen(true),
+    onOpen: () => {
+      // These two setters MUST batch into a single render so react-
+      // transition-group sees enter=false at the same instant it sees
+      // in=true — that's what makes it skip the slide-in animation and
+      // accept our current transform as the final position. React 18's
+      // automatic batching in event handlers guarantees this.
+      setSlideEnter(false);
+      setDrawerOpen(true);
+    },
     drawerWidth: DRAWER_WIDTH,
     disabled: drawerOpen,
   });
+
+  // Re-enable Slide's enter animation once the swipe-open commit is settled,
+  // so subsequent opens (hamburger tap, etc.) get the normal animation.
+  useEffect(() => {
+    if (drawerOpen && !slideEnter) {
+      const id = window.setTimeout(() => setSlideEnter(true), 50);
+      return () => window.clearTimeout(id);
+    }
+  }, [drawerOpen, slideEnter]);
 
   // Load sessions on mount
   useEffect(() => {
@@ -289,6 +313,13 @@ export default function Page() {
             enter: "cubic-bezier(0.32, 0.72, 0, 1)",
             exit: "cubic-bezier(0.32, 0.72, 0, 1)",
           },
+          // ⚠️ When our follow-finger hook has just animated the drawer to
+          // its open position, we want MUI to accept that state without
+          // running its own enter transition (which would slam transform
+          // to -100% first via handleEnter). Flip `enter` off for that
+          // specific state change only; a useEffect above re-enables it
+          // afterwards so hamburger-tap opens still animate normally.
+          enter: slideEnter,
         }}
         PaperProps={{
           sx: {

@@ -23,7 +23,17 @@ import { useEffect } from "react";
  *     animates the last few pixels to 0.
  */
 export type UseGlobalSwipeToOpenOptions = {
-  /** Called once the swipe commits (finger crossed the snap-open threshold). */
+  /**
+   * Called once the swipe commits (finger crossed the snap-open threshold).
+   * The caller MUST synchronously set both:
+   *   - The MUI Drawer's `open` state to true
+   *   - The Slide transition's `enter` prop to `false`
+   * so that when React re-renders, MUI's Slide skips its own slide-in
+   * animation. Otherwise Slide's `handleEnter` fires and *overrides* the
+   * paper's transform back to translateX(-100%), causing a visible jump.
+   * The hook has already animated the paper visually to translateX(0)
+   * before firing this, so no animation is needed on MUI's side.
+   */
   onOpen: () => void;
   /** Fully-open pixel width of the drawer paper (used to compute translate). */
   drawerWidth: number;
@@ -185,19 +195,46 @@ export function useGlobalSwipeToOpen(options: UseGlobalSwipeToOpenOptions) {
     };
 
     const commitOpen = () => {
-      // Hand off to MUI: it will render open=true and its Slide transition
-      // takes over the remaining pixels back to translateX(0). We must clear
-      // our inline transform *after* React has re-rendered, otherwise MUI
-      // sees our transform, animates from 0 to 0, and the drawer jumps.
-      onOpen();
-      requestAnimationFrame(() => {
-        if (!parts) return;
-        parts.paper.style.transform = "";
-        if (parts.backdrop) parts.backdrop.style.opacity = "";
-        restoreInlineStyles();
-        parts = null;
-        saved = null;
-      });
+      // Animate ourselves the last few pixels from wherever the finger let
+      // go to fully-open. We *cannot* hand this off to MUI's Slide because
+      // Slide's `handleEnter` unconditionally resets the paper's transform
+      // to translateX(-100%) at the start of its enter animation — which
+      // would teleport the drawer back off-screen and then slide it in over
+      // 225ms, exactly the "opens too fast, doesn't move with my finger"
+      // artifact. Instead we drive the final stretch with a CSS transition
+      // ourselves, then flip React state with Slide's `enter` disabled so
+      // MUI accepts the already-open position without re-animating.
+      if (!parts) return;
+      const { paper, backdrop } = parts;
+      const duration = 220;
+      const easing = "cubic-bezier(0.32, 0.72, 0, 1)";
+      paper.style.transition = `transform ${duration}ms ${easing}`;
+      paper.style.transform = "translate3d(0, 0, 0)";
+      if (backdrop) {
+        backdrop.style.transition = `opacity ${duration}ms ${easing}`;
+        backdrop.style.opacity = "0.5";
+      }
+      window.setTimeout(() => {
+        // Flip React state: onOpen() must synchronously set MUI open=true
+        // AND SlideProps.enter=false in the same batch. See onOpen docs.
+        onOpen();
+        // On the next frame the paper is now managed by MUI at its
+        // fully-open position — clear our inline overrides so hover/focus
+        // effects, transitions, etc. return to MUI's control.
+        requestAnimationFrame(() => {
+          if (!parts) return;
+          parts.paper.style.transform = "";
+          parts.paper.style.transition = "";
+          parts.paper.style.willChange = "";
+          if (parts.backdrop) {
+            parts.backdrop.style.opacity = "";
+            parts.backdrop.style.transition = "";
+          }
+          restoreInlineStyles();
+          parts = null;
+          saved = null;
+        });
+      }, duration);
     };
 
     const cancelDrag = () => {
