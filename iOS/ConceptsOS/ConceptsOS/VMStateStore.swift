@@ -18,7 +18,7 @@ final class VMStateStore: ObservableObject {
     /// `Self.currentTunnelSchemaVersion` on load; if the persisted value
     /// is lower we drop `tunnelInstalled` so the migration copy in
     /// SetupTunnelView is shown.
-    @Published var tunnelSchemaVersion: Int = Self.currentTunnelSchemaVersion
+    @Published var tunnelSchemaVersion: Int = VMStateStore.currentTunnelSchemaVersion
 
     /// Bump this any time we retire a WireGuard endpoint / gateway.
     ///   1 — pre-multi-tenant (LB 34.41.131.163, `default/conceptsos`).
@@ -46,7 +46,7 @@ final class VMStateStore: ObservableObject {
         wg = nil
         appURL = nil
         tunnelInstalled = false
-        tunnelSchemaVersion = Self.currentTunnelSchemaVersion
+        tunnelSchemaVersion = VMStateStore.currentTunnelSchemaVersion
         defaults.removeObject(forKey: key)
     }
 
@@ -63,11 +63,11 @@ final class VMStateStore: ObservableObject {
         // through SetupTunnelView (which explains what to delete/reimport
         // in the WireGuard app). Also clear the stale wg + appURL so
         // ProvisioningView re-fetches from the current api.
-        if self.tunnelSchemaVersion < Self.currentTunnelSchemaVersion {
+        if self.tunnelSchemaVersion < VMStateStore.currentTunnelSchemaVersion {
             self.tunnelInstalled = false
             self.wg = nil
             self.appURL = nil
-            self.tunnelSchemaVersion = Self.currentTunnelSchemaVersion
+            self.tunnelSchemaVersion = VMStateStore.currentTunnelSchemaVersion
             persist()
         }
     }
