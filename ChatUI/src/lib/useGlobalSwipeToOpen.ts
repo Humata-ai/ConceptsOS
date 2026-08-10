@@ -66,11 +66,12 @@ const defaultReject: NonNullable<UseGlobalSwipeToOpenOptions["shouldRejectTarget
 
 // The mobile SwipeableDrawer is portaled to <body>. Its paper is the sliding
 // panel; the backdrop is the semi-transparent overlay behind it.
+// We deliberately look for the Modal root: the desktop permanent Drawer
+// shares `.MuiDrawer-paper` but is `variant="permanent"` and has no Modal
+// wrapper, so restricting to `.MuiModal-root` reliably picks the temporary
+// swipeable one only.
 function findDrawerParts() {
-  // The XS-only wrapper carries this class. Fallback: any SwipeableDrawer.
-  const modal =
-    document.querySelector<HTMLElement>(".MuiModal-root") ??
-    document.querySelector<HTMLElement>(".MuiDrawer-root");
+  const modal = document.querySelector<HTMLElement>(".MuiModal-root");
   if (!modal) return null;
   const paper = modal.querySelector<HTMLElement>(".MuiDrawer-paper");
   const backdrop = modal.querySelector<HTMLElement>(".MuiBackdrop-root");
@@ -110,6 +111,12 @@ export function useGlobalSwipeToOpen(options: UseGlobalSwipeToOpenOptions) {
       modalPointerEvents: string;
       paperTransform: string;
       paperTransition: string;
+      // MUI's Slide transition writes `visibility: hidden` directly on the
+      // paper when the drawer is in the 'exited' state (Slide.js line 227),
+      // so we must override the paper's own visibility too — not just the
+      // modal wrapper's. Otherwise our transform is applied to a hidden
+      // element and the drag appears not to follow the finger at all.
+      paperVisibility: string;
       backdropOpacity: string;
       backdropTransition: string;
       backdropVisibility: string;
@@ -125,6 +132,7 @@ export function useGlobalSwipeToOpen(options: UseGlobalSwipeToOpenOptions) {
         modalPointerEvents: modal.style.pointerEvents,
         paperTransform: paper.style.transform,
         paperTransition: paper.style.transition,
+        paperVisibility: paper.style.visibility,
         backdropOpacity: backdrop?.style.opacity ?? "",
         backdropTransition: backdrop?.style.transition ?? "",
         backdropVisibility: backdrop?.style.visibility ?? "",
@@ -134,6 +142,9 @@ export function useGlobalSwipeToOpen(options: UseGlobalSwipeToOpenOptions) {
       // the app until the drawer actually commits, so pointer-events:none.
       modal.style.visibility = "visible";
       modal.style.pointerEvents = "none";
+      // ⬆️ Critical: MUI's Slide sets visibility:hidden on the paper itself
+      // when 'exited'. Without overriding this, our transform is invisible.
+      paper.style.visibility = "visible";
       paper.style.transition = "none";
       paper.style.willChange = "transform";
       if (backdrop) {
@@ -163,6 +174,7 @@ export function useGlobalSwipeToOpen(options: UseGlobalSwipeToOpenOptions) {
       // Restoring transition first so subsequent transform changes animate.
       paper.style.transition = saved.paperTransition;
       paper.style.willChange = "";
+      paper.style.visibility = saved.paperVisibility;
       modal.style.visibility = saved.modalVisibility;
       modal.style.pointerEvents = saved.modalPointerEvents;
       if (backdrop) {

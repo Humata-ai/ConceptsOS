@@ -168,6 +168,92 @@ test.describe("mobile drawer swipe", () => {
       .toBe(true);
   });
 
+  test("drawer paper tracks the finger mid-swipe (follow-finger)", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText(/new chat|ask anything/i).first()).toBeVisible();
+
+    const vp = page.viewportSize()!;
+    // Drive a swipe *manually* and sample the drawer paper's transform at
+    // an intermediate point. If the drawer merely animates itself open on
+    // release (i.e. not follow-finger), the transform will still be at its
+    // closed position (~ -drawerWidth) mid-gesture. With follow-finger, the
+    // transform should be somewhere between closed and open.
+    const samples = await page.evaluate(async () => {
+      const readTranslate = () => {
+        const paper = document.querySelector<HTMLElement>(
+          ".MuiModal-root .MuiDrawer-paper",
+        );
+        if (!paper) return null;
+        const t = paper.style.transform || getComputedStyle(paper).transform;
+        // Parse translate3d(Xpx, ...) or matrix(...)
+        const m3 = /translate3d\(([-0-9.]+)px/.exec(t);
+        if (m3) return parseFloat(m3[1]);
+        const mm = /matrix\([^)]+\)/.exec(t);
+        if (mm) {
+          const parts = mm[0].slice(7, -1).split(",").map((s) => parseFloat(s));
+          return parts[4]; // tx in a 2D matrix()
+        }
+        return null;
+      };
+
+      const startX = 200;
+      const startY = 400;
+      const endX = 380; // ~180px rightward
+      const steps = 12;
+
+      const dispatch = (type: string, x: number, y: number) => {
+        const target =
+          document.elementFromPoint(x, y) ?? document.body;
+        const touch = new Touch({
+          identifier: 42,
+          target,
+          clientX: x,
+          clientY: y,
+          pageX: x,
+          pageY: y,
+          screenX: x,
+          screenY: y,
+          radiusX: 10,
+          radiusY: 10,
+          rotationAngle: 0,
+          force: 1,
+        });
+        target.dispatchEvent(
+          new TouchEvent(type, {
+            cancelable: true,
+            bubbles: true,
+            composed: true,
+            touches: type === "touchend" ? [] : [touch],
+            targetTouches: type === "touchend" ? [] : [touch],
+            changedTouches: [touch],
+          }),
+        );
+      };
+
+      dispatch("touchstart", startX, startY);
+      const readings: Array<{ dx: number; tx: number | null }> = [];
+      for (let i = 1; i <= steps; i++) {
+        const x = startX + ((endX - startX) * i) / steps;
+        dispatch("touchmove", x, startY);
+        await new Promise((r) => setTimeout(r, 15));
+        readings.push({ dx: x - startX, tx: readTranslate() });
+      }
+      // Deliberately do NOT touchend — we want to inspect mid-gesture state.
+      return readings;
+    });
+
+    // Once the gesture has activated (dx >= ~8px), the paper's translateX
+    // should be strictly *between* closed (-280) and open (0). If our
+    // follow-finger logic isn't working, tx will stay pinned at -280 the
+    // whole time.
+    const engaged = samples.filter((s) => s.tx !== null && s.dx >= 20);
+    expect(engaged.length).toBeGreaterThan(3);
+    const anyIntermediate = engaged.some(
+      (s) => s.tx !== null && s.tx > -280 + 5 && s.tx < -5,
+    );
+    expect(anyIntermediate, `paper transform never moved off the closed edge: ${JSON.stringify(samples)}`).toBe(true);
+  });
+
   test("swipe from the far right also opens the drawer", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText(/new chat|ask anything/i).first()).toBeVisible();
