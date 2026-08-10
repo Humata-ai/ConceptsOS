@@ -4,6 +4,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
+import SwipeableDrawer from "@mui/material/SwipeableDrawer";
 import IconButton from "@mui/material/IconButton";
 import InputBase from "@mui/material/InputBase";
 import Paper from "@mui/material/Paper";
@@ -30,6 +31,14 @@ import type { SessionSummary, UiMessage } from "@/lib/types";
 import { StickToBottom } from "use-stick-to-bottom";
 
 const DRAWER_WIDTH = 280;
+
+// iOS gets slightly different SwipeableDrawer tuning: Safari's back-swipe
+// conflicts with the drawer's "discovery" nudge, and iOS's own drawers
+// don't fade the backdrop separately from the panel.
+const iOS =
+  typeof window !== "undefined" &&
+  /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+  !("MSStream" in window);
 
 export default function Page() {
   const { mode, toggle } = useContext(ColorModeContext);
@@ -241,16 +250,44 @@ export default function Page() {
       >
         {sidebar}
       </Drawer>
-      {/* Mobile drawer */}
-      <Drawer
-        variant="temporary"
+      {/* Mobile drawer — swipeable from the left edge */}
+      <SwipeableDrawer
+        anchor="left"
         open={drawerOpen}
+        onOpen={() => setDrawerOpen(true)}
         onClose={() => setDrawerOpen(false)}
+        // ⚠️ MUI's `disableSwipeToOpen` defaults to `iOS` — i.e. swipe-to-open
+        // is disabled by default on iPhones/iPads to avoid conflicting with
+        // Safari's own back-swipe. We *want* the gesture, so force it on.
+        // Our SwipeableDrawer sits at the root of the app (no browser-history
+        // navigation to conflict with), so re-enabling is safe.
+        disableSwipeToOpen={false}
+        // iOS: skip Safari's "discovery" nudge so the edge feels native,
+        // and keep the backdrop transition since iOS's own drawers fade.
+        // Non-iOS: use MUI defaults, which feel snappier on Android/desktop.
+        disableBackdropTransition={!iOS}
+        disableDiscovery={iOS}
+        // Widen the hit area from the default 20px so a finger swipe from
+        // the very left edge reliably grabs the drawer (matches iOS ~30px).
+        swipeAreaWidth={32}
         ModalProps={{ keepMounted: true }}
+        SlideProps={{
+          // Native-feeling ease-out curve (Apple's stock deceleration).
+          easing: {
+            enter: "cubic-bezier(0.32, 0.72, 0, 1)",
+            exit: "cubic-bezier(0.32, 0.72, 0, 1)",
+          },
+        }}
+        PaperProps={{
+          sx: {
+            width: DRAWER_WIDTH,
+            backgroundImage: "none",
+          },
+        }}
         sx={{ display: { xs: "block", md: "none" } }}
       >
         {sidebar}
-      </Drawer>
+      </SwipeableDrawer>
 
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <AppBar

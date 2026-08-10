@@ -20,6 +20,15 @@ export default defineConfig({
       name: "chromium",
       use: { ...devices["Desktop Chrome"], viewport: { width: 1280, height: 900 } },
     },
+    {
+      // Mobile project for touch-gesture tests (drawer swipe, etc.).
+      // Uses Pixel 5 (Chromium + hasTouch) instead of iPhone (WebKit) so we
+      // don't need to `sudo playwright install-deps` for libicu/libflite. It
+      // still catches the class of bug we care about here: a capture-phase
+      // touch handler calling preventDefault() and eating the swipe.
+      name: "mobile",
+      use: { ...devices["Pixel 5"] },
+    },
   ],
   webServer: {
     command: "npm run dev",

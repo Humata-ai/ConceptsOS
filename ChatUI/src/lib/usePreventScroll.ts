@@ -111,19 +111,49 @@ function scrollIntoView(target: Element) {
 function preventScrollMobileSafari() {
   let scrollable: Element;
   let lastY = 0;
+  let startX = 0;
+  let startY = 0;
+  // Once a touch is classified as a horizontal-dominant swipe we let every
+  // subsequent move in the same gesture pass through untouched — otherwise
+  // MUI's SwipeableDrawer (and any other horizontal gesture) can't see the
+  // events, because this listener runs at capture with passive:false.
+  let horizontalSwipe = false;
 
   const onTouchStart = (e: TouchEvent) => {
     scrollable = getScrollParent(e.target as Element);
-    if (scrollable === document.documentElement && scrollable === document.body) return;
-    lastY = e.changedTouches[0].pageY;
+    const t = e.changedTouches[0];
+    lastY = t.pageY;
+    startX = t.pageX;
+    startY = t.pageY;
+    horizontalSwipe = false;
   };
 
   const onTouchMove = (e: TouchEvent) => {
+    if (horizontalSwipe) return;
+    const t = e.changedTouches[0];
+    const dx = t.pageX - startX;
+    const dy = t.pageY - startY;
+    const adx = Math.abs(dx);
+    const ady = Math.abs(dy);
+
+    // Wait until the gesture has moved enough to know its direction. Calling
+    // preventDefault() during this window would mark the event as handled
+    // and stop MUI's SwipeableDrawer (which bails on defaultPrevented) from
+    // ever picking up the edge-swipe. 8px is roughly iOS's own recognizer.
+    if (adx < 8 && ady < 8) return;
+
+    // Horizontal-dominant → let it through for the rest of the gesture so
+    // SwipeableDrawer (and other horizontal handlers) can drive it.
+    if (adx > ady) {
+      horizontalSwipe = true;
+      return;
+    }
+
     if (!scrollable || scrollable === document.documentElement || scrollable === document.body) {
       e.preventDefault();
       return;
     }
-    const y = e.changedTouches[0].pageY;
+    const y = t.pageY;
     const { scrollTop } = scrollable as HTMLElement;
     const bottom = scrollable.scrollHeight - scrollable.clientHeight;
     if (bottom === 0) return;
