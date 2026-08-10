@@ -28,7 +28,18 @@ struct WebView: UIViewRepresentable {
 
     func updateUIView(_ webView: WKWebView, context: Context) {
         if webView.url != url {
-            webView.load(URLRequest(url: url))
+            // Force a network fetch on every app launch. iOS WKWebView
+            // will otherwise happily serve stale HTML from disk cache
+            // (and even the back/forward cache) despite the server's
+            // `Cache-Control: no-store`, which meant Dan's 2026-08-10
+            // safe-area fix (viewport-fit=cover, commit 1242ea0) kept
+            // rendering the pre-fix layout on his phone even after we
+            // rolled his ConceptsOS-VM pod to the fixed image. The
+            // wrapper is a thin shell around a remote URL, so there's
+            // no benefit to caching the shell HTML.
+            var req = URLRequest(url: url)
+            req.cachePolicy = .reloadIgnoringLocalCacheData
+            webView.load(req)
         }
     }
 }
