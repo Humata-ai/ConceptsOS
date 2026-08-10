@@ -7,6 +7,7 @@ import Drawer from "@mui/material/Drawer";
 import SwipeableDrawer from "@mui/material/SwipeableDrawer";
 import IconButton from "@mui/material/IconButton";
 import InputBase from "@mui/material/InputBase";
+import LinearProgress from "@mui/material/LinearProgress";
 import Paper from "@mui/material/Paper";
 import Stack from "@mui/material/Stack";
 import Toolbar from "@mui/material/Toolbar";
@@ -53,8 +54,15 @@ export default function Page() {
   // too fast" artifact where the drawer detaches from the finger.
   const [slideEnter, setSlideEnter] = useState(true);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
+  // True until the very first /api/sessions response settles — drives the
+  // sidebar skeleton so a cold app doesn't render as an empty panel.
+  const [sessionsLoading, setSessionsLoading] = useState(true);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [chats, setChats] = useState<Record<string, ChatState>>({});
+  // Session IDs whose persisted history is currently being fetched. Used
+  // to show a slim LinearProgress bar at the top of the message column so
+  // clicking an old chat doesn't feel dead while the fetch is in flight.
+  const [hydratingIds, setHydratingIds] = useState<Set<string>>(new Set());
   const [input, setInput] = useState("");
   const abortRef = useRef<AbortController | null>(null);
   // iOS Safari: prevent focus from scrolling the header off-screen and
@@ -101,7 +109,9 @@ export default function Page() {
       } else {
         setActiveId((prev) => prev ?? list[0].id);
       }
-    })().catch(console.error);
+    })()
+      .catch(console.error)
+      .finally(() => setSessionsLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -116,18 +126,31 @@ export default function Page() {
       return;
     }
     hydratedRef.current.add(activeId);
+    const id = activeId;
+    setHydratingIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
     (async () => {
       try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(activeId)}`);
+        const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`);
         if (!res.ok) return;
         const data = (await res.json()) as { messages: UiMessage[] };
         if (!data.messages?.length) return;
         setChats((prev) => ({
           ...prev,
-          [activeId]: { messages: data.messages, streaming: false },
+          [id]: { messages: data.messages, streaming: false },
         }));
       } catch (err) {
         console.error(err);
+      } finally {
+        setHydratingIds((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       }
     })();
   }, [activeId, chats]);
@@ -244,12 +267,15 @@ export default function Page() {
       sessions={sessions}
       activeId={activeId}
       mode={mode}
+      loading={sessionsLoading}
       onNew={newChat}
       onSelect={selectChat}
       onDelete={deleteChat}
       onToggleTheme={toggle}
     />
   );
+
+  const hydrating = !!activeId && hydratingIds.has(activeId);
 
   return (
     <Box
@@ -377,6 +403,19 @@ export default function Page() {
                 "height 0.25s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
           >
+            {hydrating && (
+              <LinearProgress
+                data-testid="hydrating-progress"
+                sx={{
+                  position: "absolute",
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  height: 2,
+                  zIndex: 1,
+                }}
+              />
+            )}
             <StickToBottom
               className="chatui-scroller"
               style={{ flex: 1, minHeight: 0, position: "relative" }}

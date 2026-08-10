@@ -7,6 +7,7 @@ import IconButton from "@mui/material/IconButton";
 import List from "@mui/material/List";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
+import Skeleton from "@mui/material/Skeleton";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 import AddIcon from "@mui/icons-material/Add";
@@ -20,6 +21,7 @@ type Props = {
   sessions: SessionSummary[];
   activeId: string | null;
   mode: "light" | "dark";
+  loading?: boolean;
   onNew: () => void;
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
@@ -80,11 +82,17 @@ const SidebarRow = memo(function SidebarRow({
   );
 });
 
+// Placeholder rows shown before the first /api/sessions response lands,
+// so the sidebar isn't jarringly empty on cold start. Pulses via MUI's
+// built-in Skeleton animation.
+const SKELETON_ROWS = 6;
+
 function SidebarImpl({
   width,
   sessions,
   activeId,
   mode,
+  loading = false,
   onNew,
   onSelect,
   onDelete,
@@ -93,22 +101,36 @@ function SidebarImpl({
   return (
     <Box sx={{ width, display: "flex", flexDirection: "column", height: "100%" }}>
       <Box sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-        <Typography variant="h6" sx={{ flex: 1 }}>ChatUI</Typography>
+        <Typography variant="h6" sx={{ flex: 1 }}>My Agent</Typography>
         <Tooltip title="New chat">
           <IconButton size="small" onClick={onNew}><AddIcon fontSize="small" /></IconButton>
         </Tooltip>
       </Box>
       <Divider />
       <List sx={{ flex: 1, overflowY: "auto", py: 0.5 }} dense>
-        {sessions.map((s) => (
-          <SidebarRow
-            key={s.id}
-            session={s}
-            active={s.id === activeId}
-            onSelect={onSelect}
-            onDelete={onDelete}
-          />
-        ))}
+        {loading && sessions.length === 0
+          ? Array.from({ length: SKELETON_ROWS }).map((_, i) => (
+              <Box
+                key={`sk-${i}`}
+                data-testid="sidebar-skeleton"
+                sx={{ mx: 2, my: 1 }}
+              >
+                <Skeleton
+                  variant="text"
+                  width={`${60 + ((i * 13) % 30)}%`}
+                  height={20}
+                />
+              </Box>
+            ))
+          : sessions.map((s) => (
+              <SidebarRow
+                key={s.id}
+                session={s}
+                active={s.id === activeId}
+                onSelect={onSelect}
+                onDelete={onDelete}
+              />
+            ))}
       </List>
       <Divider />
       <Box sx={{ p: 1, display: "flex", alignItems: "center", gap: 1 }}>
