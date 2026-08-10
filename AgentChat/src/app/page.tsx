@@ -427,7 +427,7 @@ export default function Page() {
                 style={{ padding: "16px 12px" }}
               >
                 <Box sx={{ maxWidth: 780, mx: "auto", px: { xs: 0, md: 1.5 } }}>
-                  {activeChat.messages.length === 0 && (
+                  {activeChat.messages.length === 0 && !hydrating && (
                     <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
                       Ask anything.
                     </Typography>
