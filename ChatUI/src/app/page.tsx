@@ -390,11 +390,16 @@ export default function Page() {
             sx={{
               flex: 1,
               overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
               px: { xs: 1.5, md: 3 },
               py: 2,
             }}
           >
-            <Box sx={{ maxWidth: 780, mx: "auto" }}>
+            {/* margin-top: auto pins the newest messages to the bottom so
+                the header + top of history are what get clipped when the
+                container shrinks (e.g. iOS keyboard), not the recent chat. */}
+            <Box sx={{ maxWidth: 780, mx: "auto", width: "100%", mt: "auto" }}>
               {activeChat.messages.length === 0 && (
                 <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
                   Ask anything.
