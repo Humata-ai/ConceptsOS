@@ -337,7 +337,7 @@ export default function Page() {
                   maxWidth: 780,
                   mx: "auto",
                   display: "flex",
-                  alignItems: "flex-end",
+                  alignItems: "center",
                   gap: 1,
                   px: 1.5,
                   py: 1,
@@ -394,7 +394,13 @@ export default function Page() {
                       if (!streaming) send();
                     }
                   }}
-                  sx={{ flex: 1, fontSize: 16 }}
+                  sx={{
+                    flex: 1,
+                    fontSize: 16,
+                    // Center the text vertically within the composer row
+                    // (MUI's default multiline textarea has asymmetric padding).
+                    "& textarea": { py: 0.75 },
+                  }}
                 />
                 {streaming ? (
                   <IconButton color="primary" onClick={abort} aria-label="stop">
