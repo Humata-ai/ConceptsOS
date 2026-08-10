@@ -342,6 +342,37 @@ export default function Page() {
                   px: 1.5,
                   py: 1,
                   borderRadius: 2,
+                  willChange: "transform, box-shadow, border-color",
+                  transformOrigin: "center bottom",
+                  transition: (t) =>
+                    t.transitions.create(
+                      ["transform", "box-shadow", "border-color", "background-color"],
+                      {
+                        duration: 180,
+                        easing: "cubic-bezier(0.2, 0, 0, 1)",
+                      },
+                    ),
+                  "&:hover": {
+                    borderColor: (t) => t.palette.text.secondary,
+                  },
+                  "&:focus-within": {
+                    transform: "translateY(-2px)",
+                    borderColor: (t) => t.palette.primary.main,
+                    boxShadow: (t) =>
+                      `0 8px 24px -8px ${
+                        t.palette.mode === "dark"
+                          ? "rgba(0,0,0,0.6)"
+                          : "rgba(17,24,39,0.18)"
+                      }, 0 0 0 3px ${
+                        t.palette.mode === "dark"
+                          ? "rgba(144,202,249,0.18)"
+                          : "rgba(25,118,210,0.14)"
+                      }`,
+                  },
+                  "@media (prefers-reduced-motion: reduce)": {
+                    transition: "none",
+                    "&:focus-within": { transform: "none" },
+                  },
                 }}
               >
                 <InputBase
