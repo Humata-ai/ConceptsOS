@@ -10,3 +10,10 @@ pre, code {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 }
 pre { margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+/* Prevent the chat history from scrolling horizontally. Long content
+   (code blocks, tables, wide markdown, etc.) should be contained within
+   its own inner scroller rather than making the whole conversation area
+   scroll sideways. */
+.chatui-scroller { overflow-x: hidden; }
+.chatui-scroller-content { overflow-x: hidden; max-width: 100%; min-width: 0; }
