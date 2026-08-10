@@ -3,10 +3,10 @@ import ThemeRegistry from "@/components/ThemeRegistry";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ChatUI",
+  title: "My Agent",
   description: "Chat over the tailnet",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "ChatUI", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: "My Agent", statusBarStyle: "default" },
 };
 
 export const viewport: Viewport = {

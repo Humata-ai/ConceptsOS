@@ -1,6 +1,6 @@
 {
-  "name": "ChatUI",
-  "short_name": "ChatUI",
+  "name": "My Agent",
+  "short_name": "My Agent",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fafafa",

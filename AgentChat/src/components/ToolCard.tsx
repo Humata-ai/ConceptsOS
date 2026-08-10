@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import Collapse from "@mui/material/Collapse";
@@ -25,12 +25,8 @@ const STATUS_ACCENT: Record<Status, "primary" | "error" | "success"> = {
 };
 
 export default function ToolCard({ tool }: { tool: UiToolCall }) {
-  // Auto-expand while running, collapse once done — but respect user override.
-  const [userToggled, setUserToggled] = useState(false);
-  const [open, setOpen] = useState(!tool.done);
-  useEffect(() => {
-    if (!userToggled) setOpen(!tool.done);
-  }, [tool.done, userToggled]);
+  // Default to open; user can toggle.
+  const [open, setOpen] = useState(true);
 
   const inputStr = safeJson(tool.input);
   const summary = firstLine(inputStr) || "…";
@@ -101,7 +97,6 @@ export default function ToolCard({ tool }: { tool: UiToolCall }) {
         <IconButton
           size="small"
           onClick={() => {
-            setUserToggled(true);
             setOpen((o) => !o);
           }}
           aria-label="toggle"
