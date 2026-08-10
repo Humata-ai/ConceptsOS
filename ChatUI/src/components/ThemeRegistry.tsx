@@ -17,7 +17,6 @@ export default function ThemeRegistry({ children }: { children: React.ReactNode 
   useEffect(() => {
     const saved = (localStorage.getItem("chatui-mode") as Mode | null) ?? null;
     if (saved) setMode(saved);
-    else if (window.matchMedia?.("(prefers-color-scheme: dark)").matches) setMode("dark");
   }, []);
 
   useEffect(() => {
