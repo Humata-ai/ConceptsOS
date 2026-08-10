@@ -29,6 +29,7 @@ import Reasoning from "@/components/Reasoning";
 import StreamingCursor from "@/components/StreamingCursor";
 import TypingIndicator from "@/components/TypingIndicator";
 import usePreventIOSContentScroll from "@/lib/usePreventIOSContentScroll";
+import { readSse } from "@/lib/sse";
 import type { ChatEvent, SessionSummary, UiMessage, UiToolCall } from "@/lib/types";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
@@ -634,31 +635,4 @@ function ScrollToBottomButton() {
       </IconButton>
     </Box>
   );
-}
-
-async function* readSse(stream: ReadableStream<Uint8Array>): AsyncGenerator<ChatEvent> {
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-  let buf = "";
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
-    let idx: number;
-    while ((idx = buf.indexOf("\n\n")) >= 0) {
-      const chunk = buf.slice(0, idx);
-      buf = buf.slice(idx + 2);
-      const dataLine = chunk
-        .split("\n")
-        .find((l) => l.startsWith("data:"));
-      if (!dataLine) continue;
-      const json = dataLine.slice(5).trim();
-      if (!json) continue;
-      try {
-        yield JSON.parse(json) as ChatEvent;
-      } catch {
-        /* ignore */
-      }
-    }
-  }
 }
