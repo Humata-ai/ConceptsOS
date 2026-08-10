@@ -1,126 +1,144 @@
 # ConceptsOS iOS
 
-A minimal SwiftUI iOS app whose entire UI is a `WKWebView` pointed at Dan's
-Next.js dev server on the LAN:
+Native SwiftUI iOS app. Welcome screen → **Sign in with Apple** →
+provisions a per-user ConceptsOS-VM pod on our GKE cluster → user
+imports the WireGuard config into the WireGuard iOS app → the app
+loads their pod inside a WKWebView.
 
-    http://192.168.1.230:3000
+Deployment target: iOS 16.0. Bundle id: `ai.humata.ConceptsOS`. Ships
+via TestFlight.
 
-That's the "Hello Next.js" server. If Dan's IP moves, change the `url`
-constant in [`ConceptsOS/ContentView.swift`](ConceptsOS/ConceptsOS/ContentView.swift).
-
-The bundle identifier is `ai.humata.ConceptsOS` and the deployment target is
-iOS 16.0.
-
-## Project layout
+## App state machine
 
 ```
-iOS/
-└── ConceptsOS/
-    ├── ConceptsOS.xcodeproj/       # Xcode project
-    └── ConceptsOS/
-        ├── ConceptsOSApp.swift     # @main entry point
-        ├── ContentView.swift       # Hosts the WebView
-        ├── WebView.swift           # UIViewRepresentable around WKWebView
-        ├── Info.plist              # NSAppTransportSecurity allows http://192.168.1.230
-        ├── Assets.xcassets/
-        └── Preview Content/
+ContentView.swift picks one of:
+
+  auth.session == nil                  → WelcomeView
+  session, but VM not ready            → ProvisioningView
+  VM ready, tunnel not yet installed   → SetupTunnelView   (QR + copy)
+  VM ready, tunnel installed           → WebAppView         (WKWebView on 10.10.0.1:3000)
 ```
 
-## Running locally (needs a Mac)
+State lives in two `@StateObject`s at the App level:
 
-iOS apps can only be built on macOS with Xcode. From a Mac:
+- `AuthManager` (`Auth/AuthManager.swift`) — Sign in with Apple ↔
+  Supabase JWT. Persists the session to Keychain via `SessionStorage`.
+- `VMStateStore` (`VMStateStore.swift`) — the wg config, the pod URL,
+  and a `tunnelInstalled` bool. Persisted to `UserDefaults` because
+  none of it is secret — the wg private key is separately in Keychain.
+
+## Layout
+
+```
+iOS/ConceptsOS/ConceptsOS/
+├── ConceptsOSApp.swift               @main
+├── ContentView.swift                 state machine
+├── AppConfig.swift                   URLs + anon Supabase key (public)
+├── VMStateStore.swift                UserDefaults-backed VM state
+├── ConceptsOS.entitlements           com.apple.developer.applesignin
+├── Info.plist                        ATS exceptions, encryption exempt
+├── Auth/
+│   ├── AuthManager.swift             Sign in with Apple ↔ Supabase
+│   ├── Nonce.swift                   CryptoKit random + sha256
+│   └── SessionStorage.swift          Keychain persistence
+├── API/
+│   └── ConceptsAPI.swift             POST /api/signup, GET /api/vm
+├── WireGuard/
+│   └── WireGuardKeys.swift           Curve25519 keypair + Keychain
+├── Views/
+│   ├── WelcomeView.swift             SignInWithAppleButton
+│   ├── ProvisioningView.swift        polls /api/vm every 2s
+│   ├── SetupTunnelView.swift         QR + config + "I'm connected"
+│   └── WebAppView.swift              WKWebView
+└── WebView.swift                     UIViewRepresentable wrapper
+```
+
+## The auth flow (Sign in with Apple, native)
+
+1. `SignInWithAppleButton.onRequest` is called. `AuthManager` generates
+   a random raw nonce, stores it, and sets `request.nonce = sha256(raw)`.
+2. Apple's system UI runs. On success, `onCompletion` gives us an
+   `ASAuthorizationAppleIDCredential` with a signed `identityToken` JWT.
+3. `AuthManager` POSTs to
+   `https://<project>.supabase.co/auth/v1/token?grant_type=id_token`
+   with `{ provider: "apple", id_token: <jwt>, nonce: <raw> }`.
+4. Supabase verifies the JWT signature against Apple's public keys and
+   checks that `sha256(raw) == token.nonce`. It returns its own
+   `SupabaseSession` (access_token / refresh_token / user).
+5. `SessionStorage` persists it to Keychain. `ContentView` observes
+   `auth.session` and swaps to `ProvisioningView`.
+
+The Supabase project's Apple provider is configured with
+`client_id = ai.humata.ConceptsOS` (the app's bundle id). No client
+secret / Services ID is needed for the native flow.
+
+## The VM provisioning flow
+
+1. `ProvisioningView.beginProvisioning` reads (or generates)
+   a Curve25519 keypair via `WireGuardKeyStore.loadOrCreate`. The
+   private key stays in the iOS Keychain forever.
+2. It POSTs `{ wgPubkey: <b64> }` to `https://api.conceptsos.com/api/signup`
+   with the Supabase JWT as `Authorization: Bearer`.
+3. The api service:
+   - allocates a client IP under `10.10.0.0/16`
+   - generates a preshared key
+   - writes a `public.vms` row with `status = "pending"`
+   - returns a WG config template with `PrivateKey = <FILL_IN_ON_DEVICE>`
+4. The api's background reconcile loop creates a `StatefulSet` +
+   `Service` + `Secret` for the user in the `users` namespace, then
+   pushes a peer to `wg-gateway` (which adds an `iptables` DNAT rule
+   from this user's tunnel IP → their pod's ClusterIP:3000). Once
+   the pod is Ready, `vms.status` flips to `"ready"`.
+5. `ProvisioningView` polls `GET /api/vm` every 2 seconds until
+   status is `"ready"` (typical: 30-60 seconds on first signup).
+6. `SetupTunnelView` renders the completed WG config (private key
+   filled in from Keychain) as a QR code. User imports it into the
+   WireGuard iOS app once and taps **I'm connected**.
+7. `WebAppView` loads `http://10.10.0.1:3000/` in a `WKWebView`. The
+   wg-gateway sees traffic from this user's tunnel IP, DNATs it to
+   their pod. Users cannot reach each other's pods.
+
+## Build + TestFlight (headless from Linux)
+
+Once code changes are pushed to `main`:
 
 ```bash
-git pull
-cd ConceptsOS/iOS/ConceptsOS
-open ConceptsOS.xcodeproj
+# Unlock keychain (once per Mac reboot)
+MAC_PW=$(pass show "Mac password" | head -1)
+ssh mac-mini "bash -c 'security unlock-keychain -p \"$MAC_PW\" ~/Library/Keychains/login.keychain-db && security set-keychain-settings ~/Library/Keychains/login.keychain-db'"
+
+# Pull + archive + upload
+ssh mac-mini 'bash -c "cd ~/github/Humata-ai/ConceptsOS && git pull --ff-only && bash /tmp/run-archive2.sh"'
+
+# Watch progress
+ssh mac-mini 'bash -c "tail -f /tmp/xcarchive.log"'
 ```
 
-Then in Xcode:
+The internal testing group "Humata Team" has auto-distribution ON, so
+every successful upload notifies all testers within ~15 minutes
+(processing time on Apple's side).
 
-1. Select the **ConceptsOS** scheme.
-2. Pick a simulator (e.g. iPhone 15) or a connected device.
-3. Press ⌘R.
+See the [xcode skill](../.pi/agent/skills/xcode/SKILL.md) for the full
+signing / Apple Developer setup.
 
-Make sure the Next.js dev server is actually running on Dan's machine and
-listening on `0.0.0.0` (not just `127.0.0.1`) so the phone/simulator can reach
-it. From the ConceptsOS Next.js app dir:
+## Local dev (SwiftUI previews only)
 
-```bash
-next dev -H 0.0.0.0 -p 3000
-```
-
-The iPhone must be on the same Wi-Fi network as Dan's dev box (`192.168.1.230`).
-On first launch iOS will prompt for **Local Network** permission — allow it.
-
-## TestFlight submission (needs a Mac + Apple Developer account)
-
-This can't be done from Linux. Steps for the Mac:
-
-### One-time setup
-
-1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/)
-   ($99/yr) under the Humata org (or Dan's personal account).
-2. In [App Store Connect](https://appstoreconnect.apple.com/) → **My Apps** →
-   **+** → **New App**:
-   - Platform: iOS
-   - Name: ConceptsOS
-   - Primary language: English (U.S.)
-   - Bundle ID: `ai.humata.ConceptsOS` (create it in the Developer portal first
-     if needed, under **Certificates, Identifiers & Profiles → Identifiers**)
-   - SKU: `conceptsos-ios`
-3. In Xcode, open the project and select the **ConceptsOS** target →
-   **Signing & Capabilities**. Set **Team** to the Humata / Dan team. Xcode
-   should auto-manage signing.
-
-### Every build
-
-1. In Xcode, bump `MARKETING_VERSION` (e.g. `1.0`) and/or
-   `CURRENT_PROJECT_VERSION` (build number) in the target's build settings.
-   TestFlight requires each upload to have a new build number.
-2. Set the run destination to **Any iOS Device (arm64)**.
-3. **Product → Archive**. When it finishes, the Organizer opens.
-4. Click **Distribute App → App Store Connect → Upload**. Accept the defaults
-   (automatic signing, symbols, manage version). Xcode uploads the `.ipa`.
-5. Wait ~5–15 min for App Store Connect to finish processing (you'll get an
-   email). The build appears under **TestFlight → iOS Builds**.
-6. On that build, fill in the **Export Compliance** answer (this app uses only
-   HTTPS/system crypto → "No" for encryption beyond exempt).
-7. Add yourself (and any other testers) under
-   **TestFlight → Internal Testing → + group → Testers**. Internal testers
-   (up to 100) get access as soon as the build finishes processing — no
-   Apple review needed.
-8. Install the **TestFlight** app on your iPhone, sign in with the same Apple
-   ID, accept the invite, install ConceptsOS.
-
-### Command-line alternative (once signing is set up)
-
-```bash
-cd ConceptsOS/iOS/ConceptsOS
-xcodebuild -project ConceptsOS.xcodeproj \
-  -scheme ConceptsOS \
-  -configuration Release \
-  -destination 'generic/platform=iOS' \
-  -archivePath build/ConceptsOS.xcarchive \
-  archive
-
-xcodebuild -exportArchive \
-  -archivePath build/ConceptsOS.xcarchive \
-  -exportPath build/export \
-  -exportOptionsPlist ExportOptions.plist   # see Apple docs
-
-xcrun altool --upload-app -f build/export/ConceptsOS.ipa \
-  -t ios -u <apple-id> -p <app-specific-password>
-```
+You can preview individual views on Mac. Full end-to-end testing needs
+a real device (or simulator) with the WireGuard app installed and the
+config imported. Simulator is fine for the auth + provisioning flow
+since it can reach `api.conceptsos.com` over regular HTTPS.
 
 ## Notes / gotchas
 
-- The `Info.plist` has `NSAppTransportSecurity.NSAllowsArbitraryLoads = true`
-  plus a specific exception for `192.168.1.230`. Apple will accept this for
-  TestFlight; for a public App Store release you'd want HTTPS or a documented
-  ATS justification.
-- `NSLocalNetworkUsageDescription` is set so iOS 14+ won't silently block
-  requests to the LAN.
-- If the app is white/blank on launch, either (a) Dan's dev server isn't
-  running, (b) it's bound to `127.0.0.1` only, or (c) the phone is on
-  cellular / a different Wi-Fi than `192.168.1.230`.
+- **The wg private key never leaves the device.** It's generated with
+  CryptoKit at first signup and stored in the iOS Keychain
+  (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`). If the user
+  restores this device to a new phone, they'll get a fresh keypair
+  and the server will accept it on the next `/api/signup` — the
+  `vms` row is upserted, but the old wg peer stays registered on
+  the gateway (harmless orphan). A V2 sweep can garbage-collect stale
+  peers.
+- **HTTP traffic to `10.10.0.1` is allowed** by an `NSExceptionDomain`
+  in `Info.plist`. Everything else is HTTPS (Supabase, our api).
+- **`ITSAppUsesNonExemptEncryption = false`** in `Info.plist` so every
+  upload skips the export-compliance prompt in App Store Connect.

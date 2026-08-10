@@ -135,22 +135,44 @@ the `api` service role can `insert`/`update`.
 
 ## Critical path
 
-1. **Supabase project** provisioned; Google + Apple OAuth wired; tables +
-   RLS applied.
-2. **`api/` Next.js app** scaffolded with Supabase JWT middleware,
-   `/signup` and `/vm` routes stubbed.
-3. **`ConceptsOS-VM/Dockerfile`** refactored to support
+Status as of first-cut deploy (build `1786351829`):
+
+1. ✅ **Supabase project** `emkhiqufwtevsiworiqv` provisioned. Apple
+   OAuth enabled with `client_id = ai.humata.ConceptsOS`. Tables +
+   RLS applied via `sql/0001_init.sql`.
+2. ✅ **`api/` Next.js app** deployed to GKE. `/api/signup`, `/api/vm`,
+   `/api/health`, `/api/admin/usage-sweep` all live.
+3. ✅ **`ConceptsOS-VM/Dockerfile`** refactored for
    `CONCEPTSOS_WG={embedded,external}`.
-4. **`wg-gateway` pod** built + deployed; one public UDP LB.
-5. **Reconcile loop** in `api/` — watches Supabase, creates per-user
-   StatefulSets, adds wg peers to gateway, updates `vms.status`.
-6. **Anthropic key minting** on signup; injected as K8s Secret into user
-   pod.
-7. **iOS** — native Sign in with Apple + Google, generates wg keypair,
-   calls `POST /signup`, polls `GET /vm`, imports wg config on `ready`,
-   loads `AgentChat` from tunnel IP.
-8. **Hourly usage sweep** Cloud Run job → `llm_usage` table.
-9. **TestFlight** push.
+4. ✅ **`wg-gateway` pod** deployed; public UDP LB at `35.253.153.78:51820`.
+5. ✅ **Reconcile loop** running in the `api` pod; verified end-to-end
+   (test user got a Ready pod within ~30s, deletion tore everything
+   down cleanly).
+6. ⚠️  **Anthropic key minting** — code is in place, currently running
+   in shared-key mode (falls back to `ANTHROPIC_API_KEY` because
+   `ANTHROPIC_ADMIN_KEY` isn't set yet). Both secrets are placeholders
+   in the k8s Secret; flip them to real values to unlock per-user keys.
+7. ✅ **iOS** — native Sign in with Apple wired, Curve25519 keypair
+   on-device, `POST /api/signup`, poll `GET /api/vm`, QR code for
+   manual WireGuard import (V1), WKWebView on `10.10.0.1:3000`.
+   Uploaded to TestFlight as build `1786351829` (v1.1).
+8. ✅ **Hourly usage sweep** CronJob applied; scaffolded to Anthropic
+   Admin API but returns 0 until `fetchAnthropicUsage()` is wired to
+   the real endpoint (see TODO in `api/src/app/api/admin/usage-sweep`).
+9. ✅ **TestFlight** push — auto-distributes to internal testers on
+   processing.
+
+### Still needing manual action (Dan)
+
+- Provide an `ANTHROPIC_ADMIN_KEY` (Anthropic org admin API key) and
+  `ANTHROPIC_WORKSPACE_ID`, then
+  `kubectl -n conceptsos-system patch secret conceptsos-api-secrets`
+  to flip out of shared-key mode.
+- Verify Sign in with Apple **capability** is enabled on the
+  `ai.humata.ConceptsOS` App ID in the Apple Developer portal (it's
+  usually auto-added by Xcode auto-provisioning, but confirm).
+- Add Google Sign-In in a follow-up (needs an iOS OAuth client id
+  from GCP + Supabase provider config).
 
 ## Non-goals for V1
 
