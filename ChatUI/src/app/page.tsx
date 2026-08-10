@@ -364,16 +364,15 @@ export default function Page() {
                   },
                   "&:focus-within": {
                     transform: "translateY(-2px)",
-                    borderColor: (t) => t.palette.primary.main,
+                    borderColor: (t) =>
+                      t.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.28)"
+                        : "rgba(0,0,0,0.28)",
                     boxShadow: (t) =>
                       `0 8px 24px -8px ${
                         t.palette.mode === "dark"
                           ? "rgba(0,0,0,0.6)"
                           : "rgba(17,24,39,0.18)"
-                      }, 0 0 0 3px ${
-                        t.palette.mode === "dark"
-                          ? "rgba(144,202,249,0.18)"
-                          : "rgba(25,118,210,0.14)"
                       }`,
                   },
                   "@media (prefers-reduced-motion: reduce)": {
