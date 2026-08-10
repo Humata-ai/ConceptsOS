@@ -53,11 +53,14 @@ export default function Page() {
   // resize the content container as the software keyboard opens/closes.
   const { contentRef } = usePreventIOSContentScroll();
 
-  // Perplexity-style swipe from *anywhere* on the screen to open the
-  // sidebar. MUI's SwipeableDrawer only listens near the left edge; this
-  // hook complements it for mid/right-of-screen swipes.
+  // Perplexity-style follow-finger swipe from *anywhere* on the screen to
+  // open the sidebar. MUI's SwipeableDrawer only listens near the left
+  // edge; this hook complements it by imperatively translating the drawer
+  // paper to track the finger, then handing off to MUI's Slide transition
+  // on release for the last few pixels.
   useGlobalSwipeToOpen({
     onOpen: () => setDrawerOpen(true),
+    drawerWidth: DRAWER_WIDTH,
     disabled: drawerOpen,
   });
 
