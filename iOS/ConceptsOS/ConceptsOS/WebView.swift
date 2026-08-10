@@ -1,13 +1,40 @@
 import SwiftUI
 import WebKit
+import UIKit
+
+// WKWebView silently drops JS alert/confirm/prompt dialogs unless a
+// UIDelegate translates them to native UIAlertControllers. We hit this
+// on 2026-08-10 trying to smoke-test a pod deploy with an alert() marker
+// — the alert fired but never showed. This makes them show.
+final class WebViewUIDelegate: NSObject, WKUIDelegate {
+    func webView(_ webView: WKWebView,
+                 runJavaScriptAlertPanelWithMessage message: String,
+                 initiatedByFrame frame: WKFrameInfo,
+                 completionHandler: @escaping () -> Void) {
+        let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
+        topViewController()?.present(alert, animated: true)
+    }
+
+    private func topViewController() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let window = scenes.flatMap { $0.windows }.first { $0.isKeyWindow }
+        var vc = window?.rootViewController
+        while let presented = vc?.presentedViewController { vc = presented }
+        return vc
+    }
+}
 
 struct WebView: UIViewRepresentable {
     let url: URL
+
+    func makeCoordinator() -> WebViewUIDelegate { WebViewUIDelegate() }
 
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         let webView = WKWebView(frame: .zero, configuration: config)
+        webView.uiDelegate = context.coordinator
         webView.allowsBackForwardNavigationGestures = true
         webView.scrollView.bounces = true
         // We already ignore safe area at the SwiftUI level (see
