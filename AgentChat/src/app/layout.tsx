@@ -19,6 +19,13 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   interactiveWidget: "resizes-content",
+  // Required so env(safe-area-inset-*) returns non-zero values on iOS.
+  // Without this, iOS Safari/WKWebView reports 0 for all safe-area insets
+  // for backwards compatibility, and the AppBar / composer padding
+  // (added in fcb3381 / b7d6f1b) silently resolves to 0px — meaning the
+  // status bar overlaps the header. See
+  // https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/meta/name/viewport#viewport-fit
+  viewportFit: "cover",
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "#fafafa" },
     { media: "(prefers-color-scheme: dark)", color: "#0b0b0c" },

@@ -83,12 +83,24 @@ struct WebView: UIViewRepresentable {
               var ta = document.querySelector('textarea');
               var paper = ta && ta.closest('.MuiPaper-root');
               var r = paper && paper.getBoundingClientRect();
+              var appBar = document.querySelector('header.MuiAppBar-root');
+              var ar = appBar && appBar.getBoundingClientRect();
+              var abcs = appBar && getComputedStyle(appBar);
+              // Probe env(safe-area-inset-top) directly.
+              var probe = document.createElement('div');
+              probe.style.cssText = 'position:fixed;top:0;left:0;padding-top:env(safe-area-inset-top);visibility:hidden;pointer-events:none;';
+              document.body.appendChild(probe);
+              var saTop = getComputedStyle(probe).paddingTop;
+              probe.remove();
               post('layout', [
                 'body.children=' + (document.body ? document.body.children.length : -1),
                 'html.h=' + document.documentElement.getBoundingClientRect().height,
                 'body.h=' + (document.body ? document.body.getBoundingClientRect().height : -1),
                 'ta=' + !!ta,
-                'paper=' + (paper ? (Math.round(r.x)+','+Math.round(r.y)+' '+Math.round(r.width)+'x'+Math.round(r.height)) : 'null')
+                'paper=' + (paper ? (Math.round(r.x)+','+Math.round(r.y)+' '+Math.round(r.width)+'x'+Math.round(r.height)) : 'null'),
+                'appbar=' + (appBar ? (Math.round(ar.x)+','+Math.round(ar.y)+' '+Math.round(ar.width)+'x'+Math.round(ar.height)) : 'null'),
+                'appbar.pt=' + (abcs ? abcs.paddingTop : 'null'),
+                'safeArea.top=' + saTop
               ]);
             } catch (e) { post('layout.err', [String(e)]); }
           }, 2000);
