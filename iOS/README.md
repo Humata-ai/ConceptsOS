@@ -121,6 +121,42 @@ every successful upload notifies all testers within ~15 minutes
 See the [xcode skill](../.pi/agent/skills/xcode/SKILL.md) for the full
 signing / Apple Developer setup.
 
+## Wi-Fi install to a physical iPhone (skip TestFlight)
+
+For iterating on the iOS wrapper without waiting 10-20 min for
+TestFlight processing, install a dev-signed Debug build straight onto
+a paired iPhone from the Mac. ~45s end-to-end after the first-time
+setup.
+
+One-time per phone:
+
+1. Plug phone into the Mac via USB, tap **Trust This Computer**.
+2. On the phone: **Settings → Privacy & Security → Developer Mode**
+   → toggle ON, restart, confirm.
+3. Register the phone's UDID with the developer portal:
+   ```bash
+   ssh mac-mini bash ~/github/Humata-ai/ConceptsOS/iOS/scripts/wifi-install.sh
+   # First run will fail and print the classic UDID.
+   ssh mac-mini "DEVICE_UDID=00008150-XXX DEVICE_NAME='My iPhone' \
+     bash ~/github/Humata-ai/ConceptsOS/iOS/scripts/register-device.sh"
+   ```
+
+Every build after that (Wi-Fi is fine, USB not needed):
+
+```bash
+cd ~/github/Humata-ai/ConceptsOS && git push
+MAC_PW=$(pass show "Mac password" | head -1)
+ssh mac-mini "bash -c 'security unlock-keychain -p \"$MAC_PW\" \
+  ~/Library/Keychains/login.keychain-db && \
+  cd ~/github/Humata-ai/ConceptsOS && git pull --ff-only && \
+  bash iOS/scripts/wifi-install.sh'"
+```
+
+All knobs (device id, team, bundle id, key path, …) are env-var
+overridable — see the header comments in
+[`iOS/scripts/wifi-install.sh`](scripts/wifi-install.sh) and
+[`iOS/scripts/register-device.sh`](scripts/register-device.sh).
+
 ## Local dev (SwiftUI previews only)
 
 You can preview individual views on Mac. Full end-to-end testing needs
