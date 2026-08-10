@@ -178,10 +178,35 @@ export function useGlobalSwipeToOpen(options: UseGlobalSwipeToOpenOptions) {
       }
     };
 
-    const restoreInlineStyles = () => {
+    // Two different "restore" modes because the drawer's target state after
+    // a gesture differs by outcome:
+    //   - commit: MUI is now open. Its re-render has set the correct styles
+    //     for open (visibility visible, no transform inline, etc.). We want
+    //     to *clear* our DOM overrides so React's props take over. If we
+    //     restored the pre-drag saved values here, we'd re-hide the paper
+    //     that MUI just opened — leaving an invisible modal blocking every
+    //     touch on the screen.
+    //   - cancel: drawer stays closed. MUI never re-rendered, so React's
+    //     view of the DOM is still "paper hidden, modal hidden". We must
+    //     put the DOM back exactly that way, else next-open paints stale.
+    const clearInlineOverridesForCommit = () => {
+      if (!parts) return;
+      const { modal, paper, backdrop } = parts;
+      paper.style.transition = "";
+      paper.style.transform = "";
+      paper.style.willChange = "";
+      paper.style.visibility = "";
+      modal.style.visibility = "";
+      modal.style.pointerEvents = "";
+      if (backdrop) {
+        backdrop.style.transition = "";
+        backdrop.style.visibility = "";
+        backdrop.style.opacity = "";
+      }
+    };
+    const restoreInlineStylesForCancel = () => {
       if (!parts || !saved) return;
       const { modal, paper, backdrop } = parts;
-      // Restoring transition first so subsequent transform changes animate.
       paper.style.transition = saved.paperTransition;
       paper.style.willChange = "";
       paper.style.visibility = saved.paperVisibility;
@@ -219,18 +244,14 @@ export function useGlobalSwipeToOpen(options: UseGlobalSwipeToOpenOptions) {
         // AND SlideProps.enter=false in the same batch. See onOpen docs.
         onOpen();
         // On the next frame the paper is now managed by MUI at its
-        // fully-open position — clear our inline overrides so hover/focus
-        // effects, transitions, etc. return to MUI's control.
+        // fully-open position — wipe our inline overrides so React's
+        // open-state styles (visibility visible, no inline transform,
+        // modal pointer-events auto) actually apply. Do NOT restore the
+        // saved pre-drag values here — those were captured while the
+        // drawer was closed and would re-hide the paper we just opened,
+        // trapping the whole page under an invisible modal.
         requestAnimationFrame(() => {
-          if (!parts) return;
-          parts.paper.style.transform = "";
-          parts.paper.style.transition = "";
-          parts.paper.style.willChange = "";
-          if (parts.backdrop) {
-            parts.backdrop.style.opacity = "";
-            parts.backdrop.style.transition = "";
-          }
-          restoreInlineStyles();
+          clearInlineOverridesForCommit();
           parts = null;
           saved = null;
         });
@@ -249,13 +270,14 @@ export function useGlobalSwipeToOpen(options: UseGlobalSwipeToOpenOptions) {
         backdrop.style.transition = `opacity ${duration}ms ${easing}`;
         backdrop.style.opacity = "0";
       }
-      // After the animation, clear all our overrides and let MUI's normal
-      // closed-state styles reassert.
+      // After the animation, restore the saved pre-drag styles so MUI's
+      // closed state (paper hidden, modal hidden) is visually accurate
+      // again. React never re-rendered, so it still expects those values.
       window.setTimeout(() => {
         if (!parts) return;
         parts.paper.style.transform = "";
         if (parts.backdrop) parts.backdrop.style.opacity = "";
-        restoreInlineStyles();
+        restoreInlineStylesForCancel();
         parts = null;
         saved = null;
       }, duration + 20);
@@ -348,7 +370,7 @@ export function useGlobalSwipeToOpen(options: UseGlobalSwipeToOpenOptions) {
       // If the hook is torn down mid-drag, restore styles so we don't leave
       // the drawer visually stuck half-open.
       if (engaged) {
-        restoreInlineStyles();
+        restoreInlineStylesForCancel();
         parts = null;
         saved = null;
       }

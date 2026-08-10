@@ -276,6 +276,52 @@ test.describe("mobile drawer swipe", () => {
       .toBe(true);
   });
 
+  test("after swipe-open commits, the page stays interactive", async ({ page }) => {
+    // Regression guard: on device Dan hit a state where the drawer opened,
+    // then vanished, leaving an invisible modal that ate every touch. Root
+    // cause was `restoreInlineStyles` re-applying the pre-drag saved values
+    // (paper visibility=hidden, modal visibility=hidden) *after* MUI had
+    // re-rendered into its open state. The whole screen went dead.
+    await page.goto("/");
+    await expect(page.getByText(/new chat|ask anything/i).first()).toBeVisible();
+
+    const vp = page.viewportSize()!;
+    // Full commit swipe: past the ~35% snap threshold.
+    await swipe(page, vp.width * 0.4, vp.height / 2, vp.width * 0.4 + 260, vp.height / 2);
+    await expect.poll(() => drawerIsOpen(page), { timeout: 4000 }).toBe(true);
+
+    // Wait for our commit animation (220ms) + settle time.
+    await page.waitForTimeout(400);
+
+    // The drawer paper must still be visible after commit finishes.
+    const paperVisible = await page.evaluate(() => {
+      const p = document.querySelector<HTMLElement>(".MuiModal-root .MuiDrawer-paper");
+      if (!p) return false;
+      const cs = getComputedStyle(p);
+      const r = p.getBoundingClientRect();
+      return cs.visibility !== "hidden" && cs.display !== "none" && r.width > 100;
+    });
+    expect(paperVisible, "drawer paper was hidden after swipe-open commit").toBe(true);
+
+    // And the modal wrapper must not be silently blocking touches (which
+    // is what happens if visibility:hidden was restored on the modal while
+    // it stays mounted with pointer-events:auto).
+    const modalTrapped = await page.evaluate(() => {
+      const m = document.querySelector<HTMLElement>(".MuiModal-root");
+      if (!m) return false;
+      const cs = getComputedStyle(m);
+      // The bad state: modal covers the viewport, is visibility:hidden, and
+      // yet stays hit-testable (or worse, pointer-events:none but the
+      // backdrop above it still captures). Simplest check: visibility.
+      return cs.visibility === "hidden";
+    });
+    expect(modalTrapped, "modal wrapper is visibility:hidden while open").toBe(false);
+
+    // Sanity: the sidebar's own "New chat" button should be clickable.
+    // If the page were trapped, this tap would time out.
+    await page.getByRole("button", { name: /new chat/i }).first().click({ timeout: 3000 });
+  });
+
   test("vertical scroll does not open the drawer", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText(/new chat|ask anything/i).first()).toBeVisible();
