@@ -45,7 +45,10 @@ spec:
                   key: token
           # NET_ADMIN + SYS_MODULE for wg + iptables. Kernel WireGuard is
           # built into GKE COS since 1.24, so no /dev/net/tun needed.
+          # privileged: required to set net.ipv4.ip_forward on GKE COS,
+          # which is not in the safe-sysctls list.
           securityContext:
+            privileged: true
             capabilities:
               add: ["NET_ADMIN", "SYS_MODULE"]
           volumeMounts:

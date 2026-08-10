@@ -28,6 +28,8 @@ spec:
             - name: http
               containerPort: 3100
           env:
+            - name: HOSTNAME
+              value: "0.0.0.0"
             - name: PORT
               value: "3100"
             - name: K8S_USERS_NAMESPACE

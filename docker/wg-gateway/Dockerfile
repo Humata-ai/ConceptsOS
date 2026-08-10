@@ -15,11 +15,6 @@
 #     to exactly one pod ClusterIP.
 #   * The admin API is only reachable from inside the cluster.
 
-FROM node:22-bookworm-slim AS deps
-WORKDIR /app
-COPY package.json package-lock.json* ./
-RUN npm install --no-audit --no-fund --omit=dev
-
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 
@@ -29,7 +24,9 @@ RUN set -eux; \
         wireguard-tools iproute2 iptables procps tini ca-certificates; \
     rm -rf /var/lib/apt/lists/*
 
-COPY --from=deps /app/node_modules ./node_modules
+# No third-party deps (we use only node:core). If we ever add one, restore
+# the deps stage and COPY --from=deps /app/node_modules ./node_modules.
+COPY package.json ./
 COPY src ./src
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh

@@ -42,6 +42,10 @@ EOF
 chmod 0600 /etc/wireguard/wg0.conf
 
 log "bringing up wg0"
+# If a previous container in this pod's netns left wg0 behind, wg-quick
+# will refuse to re-add it. Tear it down first; swallow errors.
+wg-quick down wg0 2>/dev/null || true
+ip link delete wg0 2>/dev/null || true
 wg-quick up wg0
 
 log "enabling IPv4 forwarding + baseline NAT"

@@ -62,14 +62,18 @@ resource "google_container_node_pool" "users" {
 resource "google_secret_manager_secret" "supabase_service_role_key" {
   project   = google_project.conceptsos.project_id
   secret_id = "supabase-service-role-key"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.extra_services]
 }
 
 resource "google_secret_manager_secret" "anthropic_admin_key" {
   project   = google_project.conceptsos.project_id
   secret_id = "anthropic-admin-key"
-  replication { auto {} }
+  replication {
+    auto {}
+  }
   depends_on = [google_project_service.extra_services]
 }
 
