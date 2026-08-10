@@ -11,3 +11,5 @@ terraform/crash.log
 # node
 app/node_modules/
 app/.next/
+ChatUI/node_modules/
+ChatUI/.next/
