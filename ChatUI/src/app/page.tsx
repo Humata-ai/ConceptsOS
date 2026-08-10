@@ -25,6 +25,7 @@ import LightIcon from "@mui/icons-material/LightMode";
 import { ColorModeContext } from "@/components/ThemeRegistry";
 import ToolCard from "@/components/ToolCard";
 import Markdown from "@/components/Markdown";
+import usePreventIOSContentScroll from "@/lib/usePreventIOSContentScroll";
 import type { ChatEvent, SessionSummary, UiMessage, UiToolCall } from "@/lib/types";
 
 const DRAWER_WIDTH = 280;
@@ -45,6 +46,9 @@ export default function Page() {
   const [input, setInput] = useState("");
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // iOS Safari: prevent focus from scrolling the header off-screen and
+  // resize the content container as the software keyboard opens/closes.
+  const { contentRef } = usePreventIOSContentScroll();
 
   // Load sessions on mount
   useEffect(() => {
@@ -312,8 +316,8 @@ export default function Page() {
     <Box
       sx={{
         display: "flex",
-        height: "100dvh",
-        width: "100%",
+        position: "fixed",
+        inset: 0,
         overflow: "hidden",
         bgcolor: "background.default",
       }}
@@ -369,30 +373,42 @@ export default function Page() {
           </Toolbar>
         </AppBar>
 
+        {/* Content container the iOS keyboard hook resizes on focus. */}
         <Box
-          ref={scrollerRef}
+          ref={contentRef}
           sx={{
             flex: 1,
-            overflowY: "auto",
-            px: { xs: 1.5, md: 3 },
-            py: 2,
+            position: "relative",
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+            transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
           }}
         >
-          <Box sx={{ maxWidth: 780, mx: "auto" }}>
-            {activeChat.messages.length === 0 && (
-              <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
-                Ask anything.
-              </Typography>
-            )}
-            <Stack spacing={2}>
-              {activeChat.messages.map((m) => (
-                <MessageView key={m.id} message={m} />
-              ))}
-            </Stack>
+          <Box
+            ref={scrollerRef}
+            sx={{
+              flex: 1,
+              overflowY: "auto",
+              px: { xs: 1.5, md: 3 },
+              py: 2,
+            }}
+          >
+            <Box sx={{ maxWidth: 780, mx: "auto" }}>
+              {activeChat.messages.length === 0 && (
+                <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
+                  Ask anything.
+                </Typography>
+              )}
+              <Stack spacing={2}>
+                {activeChat.messages.map((m) => (
+                  <MessageView key={m.id} message={m} />
+                ))}
+              </Stack>
+            </Box>
           </Box>
-        </Box>
 
-        <Box sx={{ borderTop: (t) => `1px solid ${t.palette.divider}`, p: 1.5, flexShrink: 0 }}>
+          <Box sx={{ borderTop: (t) => `1px solid ${t.palette.divider}`, p: 1.5, flexShrink: 0 }}>
           <Paper
             variant="outlined"
             sx={{
@@ -435,6 +451,7 @@ export default function Page() {
               </IconButton>
             )}
           </Paper>
+          </Box>
         </Box>
       </Box>
     </Box>
