@@ -1,19 +1,37 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Box from "@mui/material/Box";
-import Chip from "@mui/material/Chip";
+import CircularProgress from "@mui/material/CircularProgress";
 import Collapse from "@mui/material/Collapse";
 import IconButton from "@mui/material/IconButton";
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import CheckCircleIcon from "@mui/icons-material/CheckCircleOutline";
+import ErrorIcon from "@mui/icons-material/ErrorOutline";
+import BuildIcon from "@mui/icons-material/BuildOutlined";
 import type { UiToolCall } from "@/lib/types";
 
 export default function ToolCard({ tool }: { tool: UiToolCall }) {
-  const [open, setOpen] = useState(false);
+  // Auto-expand while running, collapse once done — but respect user override.
+  const [userToggled, setUserToggled] = useState(false);
+  const [open, setOpen] = useState(!tool.done);
+  useEffect(() => {
+    if (!userToggled) setOpen(!tool.done);
+  }, [tool.done, userToggled]);
+
   const inputStr = safeJson(tool.input);
   const summary = firstLine(inputStr) || "…";
+  const status: "running" | "error" | "done" = tool.isError
+    ? "error"
+    : tool.done
+      ? "done"
+      : "running";
+
+  const accent =
+    status === "error" ? "error.main" : status === "running" ? "primary.main" : "success.main";
+
   return (
     <Paper
       variant="outlined"
@@ -21,60 +39,129 @@ export default function ToolCard({ tool }: { tool: UiToolCall }) {
         my: 1,
         px: 1.25,
         py: 0.75,
-        borderColor: (t) => t.palette.divider,
+        borderColor: (t) =>
+          status === "running" ? t.palette.primary.main : t.palette.divider,
+        borderLeft: (t) => `3px solid ${
+          status === "error"
+            ? t.palette.error.main
+            : status === "running"
+              ? t.palette.primary.main
+              : t.palette.success.main
+        }`,
         bgcolor: "transparent",
+        transition: "border-color 0.2s ease",
       }}
     >
       <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-        <Chip
-          size="small"
-          label={tool.name}
-          color={tool.isError ? "error" : tool.done ? "default" : "primary"}
-          variant="outlined"
-          sx={{ height: 22 }}
+        <Box
+          sx={{
+            width: 20,
+            height: 20,
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: accent,
+            flexShrink: 0,
+          }}
+        >
+          {status === "running" ? (
+            <CircularProgress size={14} thickness={5} />
+          ) : status === "error" ? (
+            <ErrorIcon fontSize="small" />
+          ) : (
+            <CheckCircleIcon fontSize="small" />
+          )}
+        </Box>
+        <BuildIcon
+          fontSize="inherit"
+          sx={{ color: "text.secondary", fontSize: 14, flexShrink: 0 }}
         />
+        <Typography
+          variant="body2"
+          sx={{ fontWeight: 600, fontSize: 13, mr: 0.5, flexShrink: 0 }}
+        >
+          {tool.name}
+        </Typography>
         <Typography
           variant="body2"
           sx={{
             flex: 1,
             color: "text.secondary",
+            fontSize: 13,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
           }}
         >
           {summary}
         </Typography>
-        <IconButton size="small" onClick={() => setOpen((o) => !o)} aria-label="toggle">
+        <IconButton
+          size="small"
+          onClick={() => {
+            setUserToggled(true);
+            setOpen((o) => !o);
+          }}
+          aria-label="toggle"
+        >
           {open ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
         </IconButton>
       </Box>
       <Collapse in={open} unmountOnExit>
         <Box sx={{ mt: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            input
-          </Typography>
-          <Box
-            component="pre"
-            sx={{ fontSize: 12, my: 0.5, color: "text.primary", opacity: 0.9 }}
-          >
-            {inputStr}
-          </Box>
-          <Typography variant="caption" color="text.secondary">
-            {tool.done ? "output" : "streaming…"}
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
+            Input
           </Typography>
           <Box
             component="pre"
             sx={{
               fontSize: 12,
               my: 0.5,
-              color: tool.isError ? "error.main" : "text.primary",
-              opacity: 0.9,
-              maxHeight: 300,
+              px: 1,
+              py: 0.75,
+              borderRadius: 0.75,
+              bgcolor: (t) => (t.palette.mode === "dark" ? "#141519" : "#f5f5f7"),
+              border: (t) => `1px solid ${t.palette.divider}`,
               overflow: "auto",
+              maxHeight: 200,
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
             }}
           >
-            {tool.output || " "}
+            {inputStr}
+          </Box>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 0.5 }}
+          >
+            {status === "running" ? (
+              <>
+                <CircularProgress size={10} thickness={5} /> Streaming…
+              </>
+            ) : status === "error" ? (
+              "Error"
+            ) : (
+              "Output"
+            )}
+          </Typography>
+          <Box
+            component="pre"
+            sx={{
+              fontSize: 12,
+              my: 0.5,
+              px: 1,
+              py: 0.75,
+              borderRadius: 0.75,
+              bgcolor: (t) => (t.palette.mode === "dark" ? "#141519" : "#f5f5f7"),
+              border: (t) => `1px solid ${t.palette.divider}`,
+              color: status === "error" ? "error.main" : "text.primary",
+              maxHeight: 300,
+              overflow: "auto",
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {tool.output || (status === "running" ? " " : "(no output)")}
           </Box>
         </Box>
       </Collapse>
@@ -92,5 +179,5 @@ function safeJson(x: unknown): string {
 }
 function firstLine(s: string): string {
   const l = s.split("\n")[0] ?? "";
-  return l.length > 120 ? l.slice(0, 120) + "…" : l;
+  return l.length > 140 ? l.slice(0, 140) + "…" : l;
 }

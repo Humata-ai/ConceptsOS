@@ -15,7 +15,10 @@ export type UiMessage = {
   role: "user" | "assistant" | "system";
   text: string;
   thinking?: string;
+  thinkingStartedAt?: number;
+  thinkingEndedAt?: number;
   toolCalls: UiToolCall[];
+  streaming?: boolean;
 };
 
 export type UiToolCall = {

@@ -25,8 +25,12 @@ import LightIcon from "@mui/icons-material/LightMode";
 import { ColorModeContext } from "@/components/ThemeRegistry";
 import ToolCard from "@/components/ToolCard";
 import Markdown from "@/components/Markdown";
+import Reasoning from "@/components/Reasoning";
+import StreamingCursor from "@/components/StreamingCursor";
+import TypingIndicator from "@/components/TypingIndicator";
 import usePreventIOSContentScroll from "@/lib/usePreventIOSContentScroll";
 import type { ChatEvent, SessionSummary, UiMessage, UiToolCall } from "@/lib/types";
+import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
 const DRAWER_WIDTH = 280;
 
@@ -44,7 +48,6 @@ export default function Page() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [chats, setChats] = useState<Record<string, ChatState>>({});
   const [input, setInput] = useState("");
-  const scrollerRef = useRef<HTMLDivElement | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   // iOS Safari: prevent focus from scrolling the header off-screen and
   // resize the content container as the software keyboard opens/closes.
@@ -74,12 +77,6 @@ export default function Page() {
   useEffect(() => {
     if (activeId) localStorage.setItem("chatui-active", activeId);
   }, [activeId]);
-
-  // Autoscroll
-  useEffect(() => {
-    const el = scrollerRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [chats, activeId]);
 
   const activeChat = activeId ? chats[activeId] ?? emptyChat() : emptyChat();
 
@@ -157,6 +154,7 @@ export default function Page() {
         role: "assistant",
         text: "",
         toolCalls: [],
+        streaming: true,
       };
       const msg = currentAssistant;
       updateActive(id!, (c) => ({ ...c, messages: [...c.messages, msg] }));
@@ -168,6 +166,23 @@ export default function Page() {
       updateActive(id!, (c) => ({
         ...c,
         messages: c.messages.map((m) => (m.id === target.id ? mut(m) : m)),
+      }));
+    };
+
+    const finalizeAssistant = () => {
+      if (!currentAssistant) return;
+      const target = currentAssistant;
+      updateActive(id!, (c) => ({
+        ...c,
+        messages: c.messages.map((m) =>
+          m.id === target.id
+            ? {
+                ...m,
+                streaming: false,
+                thinkingEndedAt: m.thinkingEndedAt ?? (m.thinking ? Date.now() : undefined),
+              }
+            : m,
+        ),
       }));
     };
 
@@ -187,16 +202,28 @@ export default function Page() {
       function handleEvent(ev: ChatEvent) {
         switch (ev.type) {
           case "message_start":
+            finalizeAssistant();
             currentAssistant = null;
             break;
           case "message_end":
+            finalizeAssistant();
             currentAssistant = null;
             break;
           case "text_delta":
-            patchAssistant((m) => ({ ...m, text: m.text + ev.delta }));
+            patchAssistant((m) => ({
+              ...m,
+              text: m.text + ev.delta,
+              // First text delta marks the end of the thinking phase.
+              thinkingEndedAt:
+                m.thinking && !m.thinkingEndedAt ? Date.now() : m.thinkingEndedAt,
+            }));
             break;
           case "thinking_delta":
-            patchAssistant((m) => ({ ...m, thinking: (m.thinking ?? "") + ev.delta }));
+            patchAssistant((m) => ({
+              ...m,
+              thinking: (m.thinking ?? "") + ev.delta,
+              thinkingStartedAt: m.thinkingStartedAt ?? Date.now(),
+            }));
             break;
           case "tool_start": {
             const tc: UiToolCall = {
@@ -242,6 +269,7 @@ export default function Page() {
         patchAssistant((m) => ({ ...m, text: m.text + `\n\n[error] ${msg}` }));
       }
     } finally {
+      finalizeAssistant();
       abortRef.current = null;
       updateActive(id!, (c) => ({ ...c, streaming: false }));
     }
@@ -403,28 +431,37 @@ export default function Page() {
             transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
           }}
         >
-          <Box
-            ref={scrollerRef}
-            sx={{
+          <StickToBottom
+            className="chatui-scroller"
+            style={{
               flex: 1,
-              overflowY: "auto",
-              px: { xs: 1.5, md: 3 },
-              py: 2,
+              minHeight: 0,
+              position: "relative",
             }}
+            resize="smooth"
+            initial="instant"
           >
-            <Box sx={{ maxWidth: 780, mx: "auto" }}>
-              {activeChat.messages.length === 0 && (
-                <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
-                  Ask anything.
-                </Typography>
-              )}
-              <Stack spacing={2}>
-                {activeChat.messages.map((m) => (
-                  <MessageView key={m.id} message={m} />
-                ))}
-              </Stack>
-            </Box>
-          </Box>
+            <StickToBottom.Content
+              className="chatui-scroller-content"
+              style={{
+                padding: "16px 12px",
+              }}
+            >
+              <Box sx={{ maxWidth: 780, mx: "auto", px: { xs: 0, md: 1.5 } }}>
+                {activeChat.messages.length === 0 && (
+                  <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
+                    Ask anything.
+                  </Typography>
+                )}
+                <Stack spacing={2}>
+                  {activeChat.messages.map((m) => (
+                    <MessageView key={m.id} message={m} />
+                  ))}
+                </Stack>
+              </Box>
+            </StickToBottom.Content>
+            <ScrollToBottomButton />
+          </StickToBottom>
 
           <Box
             sx={{
@@ -487,8 +524,26 @@ export default function Page() {
 
 function MessageView({ message }: { message: UiMessage }) {
   const isUser = message.role === "user";
+  const streaming = !!message.streaming;
+  const thinkingActive = streaming && !!message.thinking && !message.text;
+  const showTypingDots =
+    streaming &&
+    !message.text &&
+    !message.thinking &&
+    message.toolCalls.length === 0;
+
   return (
-    <Box sx={{ display: "flex", justifyContent: isUser ? "flex-end" : "flex-start" }}>
+    <Box
+      sx={{
+        display: "flex",
+        justifyContent: isUser ? "flex-end" : "flex-start",
+        animation: "chatui-msg-in 200ms ease both",
+        "@keyframes chatui-msg-in": {
+          from: { opacity: 0, transform: "translateY(4px)" },
+          to: { opacity: 1, transform: "translateY(0)" },
+        },
+      }}
+    >
       <Box
         sx={{
           maxWidth: isUser ? "80%" : "100%",
@@ -512,13 +567,60 @@ function MessageView({ message }: { message: UiMessage }) {
           </Paper>
         ) : (
           <Box>
+            {message.thinking && (
+              <Reasoning
+                text={message.thinking}
+                streaming={thinkingActive}
+                startedAt={message.thinkingStartedAt}
+                endedAt={message.thinkingEndedAt}
+              />
+            )}
             {message.toolCalls.map((t) => (
               <ToolCard key={t.id} tool={t} />
             ))}
-            {message.text && <Markdown>{message.text}</Markdown>}
+            {message.text && (
+              <Box sx={{ position: "relative" }}>
+                <Markdown>{message.text}</Markdown>
+                {streaming && <StreamingCursor />}
+              </Box>
+            )}
+            {showTypingDots && <TypingIndicator />}
           </Box>
         )}
       </Box>
+    </Box>
+  );
+}
+
+function ScrollToBottomButton() {
+  const { isAtBottom, scrollToBottom } = useStickToBottomContext();
+  if (isAtBottom) return null;
+  return (
+    <Box
+      sx={{
+        position: "absolute",
+        bottom: 12,
+        left: 0,
+        right: 0,
+        display: "flex",
+        justifyContent: "center",
+        pointerEvents: "none",
+      }}
+    >
+      <IconButton
+        size="small"
+        onClick={() => scrollToBottom()}
+        sx={{
+          pointerEvents: "auto",
+          bgcolor: "background.paper",
+          border: (t) => `1px solid ${t.palette.divider}`,
+          boxShadow: 1,
+          "&:hover": { bgcolor: "background.paper" },
+        }}
+        aria-label="scroll to bottom"
+      >
+        <SendIcon sx={{ transform: "rotate(180deg)", fontSize: 18 }} />
+      </IconButton>
     </Box>
   );
 }
