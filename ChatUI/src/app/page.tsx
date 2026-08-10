@@ -1,33 +1,22 @@
 "use client";
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
 import IconButton from "@mui/material/IconButton";
 import InputBase from "@mui/material/InputBase";
-import List from "@mui/material/List";
-import ListItemButton from "@mui/material/ListItemButton";
-import ListItemText from "@mui/material/ListItemText";
 import Paper from "@mui/material/Paper";
+import Stack from "@mui/material/Stack";
 import Toolbar from "@mui/material/Toolbar";
 import Typography from "@mui/material/Typography";
-import Divider from "@mui/material/Divider";
-import Stack from "@mui/material/Stack";
-import Tooltip from "@mui/material/Tooltip";
 import MenuIcon from "@mui/icons-material/Menu";
-import AddIcon from "@mui/icons-material/Add";
 import SendIcon from "@mui/icons-material/ArrowUpward";
 import StopIcon from "@mui/icons-material/Stop";
-import DeleteIcon from "@mui/icons-material/DeleteOutline";
-import DarkIcon from "@mui/icons-material/DarkMode";
-import LightIcon from "@mui/icons-material/LightMode";
 import { ColorModeContext } from "@/components/ThemeRegistry";
-import ToolCard from "@/components/ToolCard";
-import Markdown from "@/components/Markdown";
-import Reasoning from "@/components/Reasoning";
-import StreamingCursor from "@/components/StreamingCursor";
-import TypingIndicator from "@/components/TypingIndicator";
+import MessageView from "@/components/MessageView";
+import ScrollToBottomButton from "@/components/ScrollToBottomButton";
+import Sidebar from "@/components/Sidebar";
 import usePreventIOSContentScroll from "@/lib/usePreventIOSContentScroll";
 import { readSse } from "@/lib/sse";
 import {
@@ -37,8 +26,8 @@ import {
   endStream,
   type ChatState,
 } from "@/lib/chatReducer";
-import type { SessionSummary, UiMessage } from "@/lib/types";
-import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
+import type { SessionSummary } from "@/lib/types";
+import { StickToBottom } from "use-stick-to-bottom";
 
 const DRAWER_WIDTH = 280;
 
@@ -171,57 +160,22 @@ export default function Page() {
 
   const streaming = activeChat.streaming;
 
+  const selectChat = useCallback((id: string) => {
+    setActiveId(id);
+    setDrawerOpen(false);
+  }, []);
+
   const sidebar = (
-    <Box sx={{ width: DRAWER_WIDTH, display: "flex", flexDirection: "column", height: "100%" }}>
-      <Box sx={{ p: 1.5, display: "flex", alignItems: "center", gap: 1 }}>
-        <Typography variant="h6" sx={{ flex: 1 }}>ChatUI</Typography>
-        <Tooltip title="New chat">
-          <IconButton size="small" onClick={newChat}><AddIcon fontSize="small" /></IconButton>
-        </Tooltip>
-      </Box>
-      <Divider />
-      <List sx={{ flex: 1, overflowY: "auto", py: 0.5 }} dense>
-        {sessions.map((s) => (
-          <ListItemButton
-            key={s.id}
-            selected={s.id === activeId}
-            onClick={() => {
-              setActiveId(s.id);
-              setDrawerOpen(false);
-            }}
-            sx={{ mx: 1, my: 0.25 }}
-          >
-            <ListItemText
-              primary={s.title}
-              primaryTypographyProps={{
-                noWrap: true,
-                fontSize: 13,
-                fontWeight: s.id === activeId ? 600 : 400,
-              }}
-            />
-            <IconButton
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteChat(s.id);
-              }}
-              sx={{ opacity: 0.5, "&:hover": { opacity: 1 } }}
-            >
-              <DeleteIcon fontSize="inherit" />
-            </IconButton>
-          </ListItemButton>
-        ))}
-      </List>
-      <Divider />
-      <Box sx={{ p: 1, display: "flex", alignItems: "center", gap: 1 }}>
-        <IconButton size="small" onClick={toggle} aria-label="toggle theme">
-          {mode === "dark" ? <LightIcon fontSize="small" /> : <DarkIcon fontSize="small" />}
-        </IconButton>
-        <Typography variant="caption" color="text.secondary">
-          {mode === "dark" ? "dark" : "light"}
-        </Typography>
-      </Box>
-    </Box>
+    <Sidebar
+      width={DRAWER_WIDTH}
+      sessions={sessions}
+      activeId={activeId}
+      mode={mode}
+      onNew={newChat}
+      onSelect={selectChat}
+      onDelete={deleteChat}
+      onToggleTheme={toggle}
+    />
   );
 
   return (
@@ -299,219 +253,103 @@ export default function Page() {
         {/* Outer box holds the flex slot; inner absolute box is what the
             iOS keyboard hook resizes/shifts. Absolute positioning lets the
             hook's inline height/bottom take effect without fighting flex. */}
-        <Box
-          sx={{
-            flex: 1,
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-        <Box
-          ref={contentRef}
-          sx={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-            transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
-          }}
-        >
-          <StickToBottom
-            className="chatui-scroller"
-            style={{
-              flex: 1,
-              minHeight: 0,
-              position: "relative",
+        <Box sx={{ flex: 1, position: "relative", overflow: "hidden" }}>
+          <Box
+            ref={contentRef}
+            sx={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              transition:
+                "height 0.25s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
             }}
-            resize="smooth"
-            initial="instant"
           >
-            <StickToBottom.Content
-              className="chatui-scroller-content"
-              style={{
-                padding: "16px 12px",
+            <StickToBottom
+              className="chatui-scroller"
+              style={{ flex: 1, minHeight: 0, position: "relative" }}
+              resize="smooth"
+              initial="instant"
+            >
+              <StickToBottom.Content
+                className="chatui-scroller-content"
+                style={{ padding: "16px 12px" }}
+              >
+                <Box sx={{ maxWidth: 780, mx: "auto", px: { xs: 0, md: 1.5 } }}>
+                  {activeChat.messages.length === 0 && (
+                    <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
+                      Ask anything.
+                    </Typography>
+                  )}
+                  <Stack spacing={2}>
+                    {activeChat.messages.map((m) => (
+                      <MessageView key={m.id} message={m} />
+                    ))}
+                  </Stack>
+                </Box>
+              </StickToBottom.Content>
+              <ScrollToBottomButton />
+            </StickToBottom>
+
+            <Box
+              sx={{
+                borderTop: (t) => `1px solid ${t.palette.divider}`,
+                px: 1.5,
+                pt: 1.5,
+                pb: "calc(12px + env(safe-area-inset-bottom))",
+                flexShrink: 0,
               }}
             >
-              <Box sx={{ maxWidth: 780, mx: "auto", px: { xs: 0, md: 1.5 } }}>
-                {activeChat.messages.length === 0 && (
-                  <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
-                    Ask anything.
-                  </Typography>
-                )}
-                <Stack spacing={2}>
-                  {activeChat.messages.map((m) => (
-                    <MessageView key={m.id} message={m} />
-                  ))}
-                </Stack>
-              </Box>
-            </StickToBottom.Content>
-            <ScrollToBottomButton />
-          </StickToBottom>
-
-          <Box
-            sx={{
-              borderTop: (t) => `1px solid ${t.palette.divider}`,
-              px: 1.5,
-              pt: 1.5,
-              pb: "calc(12px + env(safe-area-inset-bottom))",
-              flexShrink: 0,
-            }}
-          >
-          <Paper
-            variant="outlined"
-            sx={{
-              maxWidth: 780,
-              mx: "auto",
-              display: "flex",
-              alignItems: "flex-end",
-              gap: 1,
-              px: 1.5,
-              py: 1,
-              borderRadius: 2,
-            }}
-          >
-            <InputBase
-              multiline
-              maxRows={8}
-              value={input}
-              placeholder="Send a message…"
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (!streaming) send();
-                }
-              }}
-              sx={{ flex: 1, fontSize: 16 }}
-            />
-            {streaming ? (
-              <IconButton color="primary" onClick={abort} aria-label="stop">
-                <StopIcon />
-              </IconButton>
-            ) : (
-              <IconButton
-                color="primary"
-                onClick={send}
-                disabled={!input.trim()}
-                aria-label="send"
+              <Paper
+                variant="outlined"
+                sx={{
+                  maxWidth: 780,
+                  mx: "auto",
+                  display: "flex",
+                  alignItems: "flex-end",
+                  gap: 1,
+                  px: 1.5,
+                  py: 1,
+                  borderRadius: 2,
+                }}
               >
-                <SendIcon />
-              </IconButton>
-            )}
-          </Paper>
+                <InputBase
+                  multiline
+                  maxRows={8}
+                  value={input}
+                  placeholder="Send a message…"
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (!streaming) send();
+                    }
+                  }}
+                  sx={{ flex: 1, fontSize: 16 }}
+                />
+                {streaming ? (
+                  <IconButton color="primary" onClick={abort} aria-label="stop">
+                    <StopIcon />
+                  </IconButton>
+                ) : (
+                  <IconButton
+                    color="primary"
+                    onClick={send}
+                    disabled={!input.trim()}
+                    aria-label="send"
+                  >
+                    <SendIcon />
+                  </IconButton>
+                )}
+              </Paper>
+            </Box>
           </Box>
         </Box>
-        </Box>
       </Box>
-    </Box>
-  );
-}
-
-function MessageView({ message }: { message: UiMessage }) {
-  const isUser = message.role === "user";
-  const streaming = !!message.streaming;
-  const thinkingActive = streaming && !!message.thinking && !message.text;
-  const showTypingDots =
-    streaming &&
-    !message.text &&
-    !message.thinking &&
-    message.toolCalls.length === 0;
-
-  return (
-    <Box
-      data-testid={isUser ? "user-message" : "assistant-message"}
-      data-streaming={streaming ? "true" : "false"}
-      sx={{
-        display: "flex",
-        justifyContent: isUser ? "flex-end" : "flex-start",
-        animation: "chatui-msg-in 200ms ease both",
-        "@keyframes chatui-msg-in": {
-          from: { opacity: 0, transform: "translateY(4px)" },
-          to: { opacity: 1, transform: "translateY(0)" },
-        },
-      }}
-    >
-      <Box
-        sx={{
-          maxWidth: isUser ? "80%" : "100%",
-          width: isUser ? "auto" : "100%",
-        }}
-      >
-        {isUser ? (
-          <Paper
-            variant="outlined"
-            sx={{
-              px: 1.5,
-              py: 1,
-              borderRadius: 2,
-              bgcolor: (t) => (t.palette.mode === "dark" ? "#1b1d22" : "#f0f4ff"),
-              borderColor: (t) => t.palette.divider,
-            }}
-          >
-            <Typography component="pre" sx={{ whiteSpace: "pre-wrap", fontSize: 14 }}>
-              {message.text}
-            </Typography>
-          </Paper>
-        ) : (
-          <Box>
-            {message.thinking && (
-              <Reasoning
-                text={message.thinking}
-                streaming={thinkingActive}
-                startedAt={message.thinkingStartedAt}
-                endedAt={message.thinkingEndedAt}
-              />
-            )}
-            {message.toolCalls.map((t) => (
-              <ToolCard key={t.id} tool={t} />
-            ))}
-            {message.text && (
-              <Box data-testid="assistant-text" sx={{ position: "relative" }}>
-                <Markdown>{message.text}</Markdown>
-                {streaming && <StreamingCursor />}
-              </Box>
-            )}
-            {showTypingDots && <TypingIndicator />}
-          </Box>
-        )}
-      </Box>
-    </Box>
-  );
-}
-
-function ScrollToBottomButton() {
-  const { isAtBottom, scrollToBottom } = useStickToBottomContext();
-  if (isAtBottom) return null;
-  return (
-    <Box
-      sx={{
-        position: "absolute",
-        bottom: 12,
-        left: 0,
-        right: 0,
-        display: "flex",
-        justifyContent: "center",
-        pointerEvents: "none",
-      }}
-    >
-      <IconButton
-        size="small"
-        onClick={() => scrollToBottom()}
-        sx={{
-          pointerEvents: "auto",
-          bgcolor: "background.paper",
-          border: (t) => `1px solid ${t.palette.divider}`,
-          boxShadow: 1,
-          "&:hover": { bgcolor: "background.paper" },
-        }}
-        aria-label="scroll to bottom"
-      >
-        <SendIcon sx={{ transform: "rotate(180deg)", fontSize: 18 }} />
-      </IconButton>
     </Box>
   );
 }
