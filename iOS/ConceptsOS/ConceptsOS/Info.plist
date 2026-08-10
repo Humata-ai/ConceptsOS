@@ -55,6 +55,7 @@
             </dict>
         </dict>
     </dict>
+    <!-- Sign in with Apple entitlement is declared in ConceptsOS.entitlements. -->
     <!-- Skip Export Compliance prompt for every TestFlight build. App uses only Apple stdlib crypto (HTTPS). -->
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>

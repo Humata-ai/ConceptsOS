@@ -12,6 +12,17 @@
 		A100000000000000000000A3 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000A3 /* WebView.swift */; };
 		A100000000000000000000A4 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000A4 /* Assets.xcassets */; };
 		A100000000000000000000A5 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000A5 /* Preview Assets.xcassets */; };
+		A100000000000000000000B1 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B1 /* AppConfig.swift */; };
+		A100000000000000000000B2 /* VMStateStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B2 /* VMStateStore.swift */; };
+		A100000000000000000000B3 /* AuthManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B3 /* AuthManager.swift */; };
+		A100000000000000000000B4 /* Nonce.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B4 /* Nonce.swift */; };
+		A100000000000000000000B5 /* SessionStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B5 /* SessionStorage.swift */; };
+		A100000000000000000000B6 /* ConceptsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B6 /* ConceptsAPI.swift */; };
+		A100000000000000000000B7 /* WireGuardKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B7 /* WireGuardKeys.swift */; };
+		A100000000000000000000B8 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B8 /* WelcomeView.swift */; };
+		A100000000000000000000B9 /* ProvisioningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B9 /* ProvisioningView.swift */; };
+		A100000000000000000000BA /* SetupTunnelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000BA /* SetupTunnelView.swift */; };
+		A100000000000000000000BB /* WebAppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000BB /* WebAppView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -22,6 +33,18 @@
 		B100000000000000000000A4 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B100000000000000000000A5 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
 		B100000000000000000000A6 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B100000000000000000000A7 /* ConceptsOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = ConceptsOS.entitlements; sourceTree = "<group>"; };
+		B100000000000000000000B1 /* AppConfig.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConfig.swift; sourceTree = "<group>"; };
+		B100000000000000000000B2 /* VMStateStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VMStateStore.swift; sourceTree = "<group>"; };
+		B100000000000000000000B3 /* AuthManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthManager.swift; sourceTree = "<group>"; };
+		B100000000000000000000B4 /* Nonce.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Nonce.swift; sourceTree = "<group>"; };
+		B100000000000000000000B5 /* SessionStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStorage.swift; sourceTree = "<group>"; };
+		B100000000000000000000B6 /* ConceptsAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConceptsAPI.swift; sourceTree = "<group>"; };
+		B100000000000000000000B7 /* WireGuardKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireGuardKeys.swift; sourceTree = "<group>"; };
+		B100000000000000000000B8 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		B100000000000000000000B9 /* ProvisioningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvisioningView.swift; sourceTree = "<group>"; };
+		B100000000000000000000BA /* SetupTunnelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupTunnelView.swift; sourceTree = "<group>"; };
+		B100000000000000000000BB /* WebAppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -49,8 +72,15 @@
 				B100000000000000000000A1 /* ConceptsOSApp.swift */,
 				B100000000000000000000A2 /* ContentView.swift */,
 				B100000000000000000000A3 /* WebView.swift */,
+				B100000000000000000000B1 /* AppConfig.swift */,
+				B100000000000000000000B2 /* VMStateStore.swift */,
+				D000000000000000000000B0 /* Auth */,
+				D000000000000000000000B1 /* API */,
+				D000000000000000000000B2 /* WireGuard */,
+				D000000000000000000000B3 /* Views */,
 				B100000000000000000000A4 /* Assets.xcassets */,
 				B100000000000000000000A6 /* Info.plist */,
+				B100000000000000000000A7 /* ConceptsOS.entitlements */,
 				D000000000000000000000A3 /* Preview Content */,
 			);
 			path = ConceptsOS;
@@ -70,6 +100,43 @@
 				B100000000000000000000A5 /* Preview Assets.xcassets */,
 			);
 			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		D000000000000000000000B0 /* Auth */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000B3 /* AuthManager.swift */,
+				B100000000000000000000B4 /* Nonce.swift */,
+				B100000000000000000000B5 /* SessionStorage.swift */,
+			);
+			path = Auth;
+			sourceTree = "<group>";
+		};
+		D000000000000000000000B1 /* API */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000B6 /* ConceptsAPI.swift */,
+			);
+			path = API;
+			sourceTree = "<group>";
+		};
+		D000000000000000000000B2 /* WireGuard */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000B7 /* WireGuardKeys.swift */,
+			);
+			path = WireGuard;
+			sourceTree = "<group>";
+		};
+		D000000000000000000000B3 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				B100000000000000000000B8 /* WelcomeView.swift */,
+				B100000000000000000000B9 /* ProvisioningView.swift */,
+				B100000000000000000000BA /* SetupTunnelView.swift */,
+				B100000000000000000000BB /* WebAppView.swift */,
+			);
+			path = Views;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -145,6 +212,17 @@
 				A100000000000000000000A2 /* ContentView.swift in Sources */,
 				A100000000000000000000A3 /* WebView.swift in Sources */,
 				A100000000000000000000A1 /* ConceptsOSApp.swift in Sources */,
+				A100000000000000000000B1 /* AppConfig.swift in Sources */,
+				A100000000000000000000B2 /* VMStateStore.swift in Sources */,
+				A100000000000000000000B3 /* AuthManager.swift in Sources */,
+				A100000000000000000000B4 /* Nonce.swift in Sources */,
+				A100000000000000000000B5 /* SessionStorage.swift in Sources */,
+				A100000000000000000000B6 /* ConceptsAPI.swift in Sources */,
+				A100000000000000000000B7 /* WireGuardKeys.swift in Sources */,
+				A100000000000000000000B8 /* WelcomeView.swift in Sources */,
+				A100000000000000000000B9 /* ProvisioningView.swift in Sources */,
+				A100000000000000000000BA /* SetupTunnelView.swift in Sources */,
+				A100000000000000000000BB /* WebAppView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -212,8 +290,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ConceptsOS/ConceptsOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "\"ConceptsOS/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -225,7 +304,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.humata.ConceptsOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -239,8 +318,9 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ConceptsOS/ConceptsOS.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_ASSET_PATHS = "\"ConceptsOS/Preview Content\"";
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -252,7 +332,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.humata.ConceptsOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
