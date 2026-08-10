@@ -19,6 +19,7 @@ import MessageView from "@/components/MessageView";
 import ScrollToBottomButton from "@/components/ScrollToBottomButton";
 import Sidebar from "@/components/Sidebar";
 import usePreventIOSContentScroll from "@/lib/usePreventIOSContentScroll";
+import { useGlobalSwipeToOpen } from "@/lib/useGlobalSwipeToOpen";
 import { readSse } from "@/lib/sse";
 import {
   applyChatEvent,
@@ -51,6 +52,14 @@ export default function Page() {
   // iOS Safari: prevent focus from scrolling the header off-screen and
   // resize the content container as the software keyboard opens/closes.
   const { contentRef } = usePreventIOSContentScroll();
+
+  // Perplexity-style swipe from *anywhere* on the screen to open the
+  // sidebar. MUI's SwipeableDrawer only listens near the left edge; this
+  // hook complements it for mid/right-of-screen swipes.
+  useGlobalSwipeToOpen({
+    onOpen: () => setDrawerOpen(true),
+    disabled: drawerOpen,
+  });
 
   // Load sessions on mount
   useEffect(() => {

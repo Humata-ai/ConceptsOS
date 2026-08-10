@@ -152,6 +152,55 @@ test.describe("mobile drawer swipe", () => {
       .toBe(true);
   });
 
+  test("swipe from mid-screen (not edge) also opens the drawer", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText(/new chat|ask anything/i).first()).toBeVisible();
+
+    const vp = page.viewportSize()!;
+    // Start well past the 32px SwipeArea — this must be handled by our
+    // custom useGlobalSwipeToOpen hook, not MUI's edge detection.
+    await swipe(page, vp.width * 0.5, vp.height / 2, vp.width * 0.5 + 120, vp.height / 2);
+    await expect
+      .poll(() => drawerIsOpen(page), {
+        timeout: 4000,
+        message: "mid-screen horizontal swipe did not open the drawer",
+      })
+      .toBe(true);
+  });
+
+  test("swipe from the far right also opens the drawer", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText(/new chat|ask anything/i).first()).toBeVisible();
+
+    const vp = page.viewportSize()!;
+    // From near the right edge, swipe left-to-right by ~100px (as far as we
+    // can before running off-screen). This is the Perplexity behavior Dan
+    // called out explicitly.
+    const fromX = vp.width - 40;
+    await swipe(page, fromX, vp.height / 2, fromX - 100, vp.height / 2, 24, 10);
+    // Wait a beat, then assert the drawer did NOT open (right-to-left swipe
+    // should never open a left-anchored drawer).
+    await page.waitForTimeout(500);
+    expect(await drawerIsOpen(page)).toBe(false);
+
+    // Now the actual test: swipe rightward from near the right side.
+    await swipe(page, vp.width * 0.7, vp.height / 2, vp.width * 0.7 + 120, vp.height / 2);
+    await expect
+      .poll(() => drawerIsOpen(page), { timeout: 4000 })
+      .toBe(true);
+  });
+
+  test("vertical scroll does not open the drawer", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText(/new chat|ask anything/i).first()).toBeVisible();
+
+    const vp = page.viewportSize()!;
+    // Straight-down swipe should scroll, not open the drawer.
+    await swipe(page, vp.width / 2, 100, vp.width / 2, 400);
+    await page.waitForTimeout(500);
+    expect(await drawerIsOpen(page)).toBe(false);
+  });
+
   test("swipe closes an open drawer, then swipe opens it again", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByText(/new chat|ask anything/i).first()).toBeVisible();
