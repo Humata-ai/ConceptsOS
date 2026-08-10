@@ -26,7 +26,7 @@ import {
   endStream,
   type ChatState,
 } from "@/lib/chatReducer";
-import type { SessionSummary } from "@/lib/types";
+import type { SessionSummary, UiMessage } from "@/lib/types";
 import { StickToBottom } from "use-stick-to-bottom";
 
 const DRAWER_WIDTH = 280;
@@ -58,6 +58,33 @@ export default function Page() {
     })().catch(console.error);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Lazily hydrate persisted message history the first time a session is
+  // selected (or when returning to one whose messages haven't been loaded).
+  const hydratedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeId) return;
+    if (hydratedRef.current.has(activeId)) return;
+    if (chats[activeId]?.messages.length) {
+      hydratedRef.current.add(activeId);
+      return;
+    }
+    hydratedRef.current.add(activeId);
+    (async () => {
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(activeId)}`);
+        if (!res.ok) return;
+        const data = (await res.json()) as { messages: UiMessage[] };
+        if (!data.messages?.length) return;
+        setChats((prev) => ({
+          ...prev,
+          [activeId]: { messages: data.messages, streaming: false },
+        }));
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+  }, [activeId, chats]);
 
   // Restore last active from localStorage
   useEffect(() => {

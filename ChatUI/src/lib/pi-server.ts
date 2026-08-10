@@ -1,21 +1,30 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
-import type { ChatEvent, SessionSummary } from "./types";
+import { homedir } from "node:os";
+import { rm } from "node:fs/promises";
+import type { ChatEvent, SessionSummary, UiMessage, UiToolCall } from "./types";
 
 // Lazy import so Next doesn't try to bundle the SDK.
 type PiSdk = typeof import("@earendil-works/pi-coding-agent");
 
+/** Working directory used for every agent session in ChatUI. */
+const AGENT_CWD = homedir();
+
 type ServerSession = {
+  /** Stable id we expose to the UI == SessionManager.getSessionId(). */
   id: string;
-  title: string;
+  /** Full path to the JSONL file. */
+  path: string;
   createdAt: number;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   session: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  sessionManager: any;
   disposed: boolean;
 };
 
 type Store = {
-  sessions: Map<string, ServerSession>;
+  /** Live in-process cache of hydrated AgentSessions, keyed by session id. */
+  live: Map<string, ServerSession>;
   sdk?: PiSdk;
   sdkInit?: Promise<PiSdk>;
 };
@@ -23,7 +32,7 @@ type Store = {
 // Survive Next.js dev HMR by pinning to globalThis.
 const g = globalThis as unknown as { __chatuiStore?: Store };
 if (!g.__chatuiStore) {
-  g.__chatuiStore = { sessions: new Map() };
+  g.__chatuiStore = { live: new Map() };
 }
 const store = g.__chatuiStore;
 
@@ -38,57 +47,110 @@ async function loadSdk(): Promise<PiSdk> {
   return store.sdkInit;
 }
 
-export async function createSession(title?: string): Promise<SessionSummary> {
-  const sdk = await loadSdk();
-  const { createAgentSession, SessionManager } = sdk;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function hydrateSession(sm: any): Promise<ServerSession> {
+  const { createAgentSession } = await loadSdk();
   const { session } = await createAgentSession({
-    sessionManager: SessionManager.inMemory(),
+    cwd: AGENT_CWD,
+    sessionManager: sm,
   });
-  const id = randomUUID();
+  const id: string = sm.getSessionId();
+  const path: string = sm.getSessionFile() ?? "";
   const entry: ServerSession = {
     id,
-    title: title || "New chat",
+    path,
     createdAt: Date.now(),
     session,
+    sessionManager: sm,
     disposed: false,
   };
-  store.sessions.set(id, entry);
-  return summarize(entry);
+  store.live.set(id, entry);
+  return entry;
 }
 
-export function listSessions(): SessionSummary[] {
-  return [...store.sessions.values()]
-    .filter((s) => !s.disposed)
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .map(summarize);
+/** Create a new persisted session under ~/.pi/agent/sessions/--home-…--/. */
+export async function createSession(title?: string): Promise<SessionSummary> {
+  const { SessionManager } = await loadSdk();
+  const sm = SessionManager.create(AGENT_CWD);
+  const entry = await hydrateSession(sm);
+  if (title && title.trim()) {
+    try {
+      sm.appendSessionInfo(title.trim());
+    } catch {
+      /* ignore */
+    }
+  }
+  return summarizeLive(entry, title);
 }
 
-export function getSession(id: string): ServerSession | undefined {
-  const s = store.sessions.get(id);
-  if (!s || s.disposed) return undefined;
-  return s;
+/** List all sessions on disk for the ChatUI bucket (~/.pi/agent/sessions/--home-…--/). */
+export async function listSessions(): Promise<SessionSummary[]> {
+  const { SessionManager } = await loadSdk();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const infos: any[] = await SessionManager.list(AGENT_CWD);
+  return infos
+    .map((info) => ({
+      id: info.id as string,
+      title:
+        (info.name as string | undefined)?.trim() ||
+        (info.firstMessage as string | undefined)?.slice(0, 60).replace(/\s+/g, " ").trim() ||
+        "New chat",
+      createdAt: new Date(info.created).getTime(),
+      messageCount: info.messageCount as number,
+      path: info.path as string,
+    }))
+    .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+/** Get (or lazily hydrate) a live AgentSession by id. */
+export async function getSession(id: string): Promise<ServerSession | undefined> {
+  const cached = store.live.get(id);
+  if (cached && !cached.disposed) return cached;
+
+  const { SessionManager } = await loadSdk();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const infos: any[] = await SessionManager.list(AGENT_CWD);
+  const info = infos.find((i) => i.id === id);
+  if (!info) return undefined;
+  const sm = SessionManager.open(info.path);
+  return hydrateSession(sm);
 }
 
 export async function deleteSession(id: string): Promise<boolean> {
-  const s = store.sessions.get(id);
-  if (!s) return false;
-  try {
-    await s.session.abort?.();
-  } catch {
-    /* ignore */
+  const s = store.live.get(id);
+  let path: string | undefined = s?.path;
+  if (s) {
+    try {
+      await s.session.abort?.();
+    } catch {
+      /* ignore */
+    }
+    try {
+      s.session.dispose?.();
+    } catch {
+      /* ignore */
+    }
+    s.disposed = true;
+    store.live.delete(id);
   }
-  try {
-    s.session.dispose?.();
-  } catch {
-    /* ignore */
+  if (!path) {
+    const { SessionManager } = await loadSdk();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const infos: any[] = await SessionManager.list(AGENT_CWD);
+    path = infos.find((i) => i.id === id)?.path;
   }
-  s.disposed = true;
-  store.sessions.delete(id);
+  if (path) {
+    try {
+      await rm(path, { force: true });
+    } catch {
+      /* ignore */
+    }
+  }
   return true;
 }
 
 export async function abortSession(id: string): Promise<boolean> {
-  const s = getSession(id);
+  const s = await getSession(id);
   if (!s) return false;
   try {
     await s.session.abort();
@@ -98,14 +160,92 @@ export async function abortSession(id: string): Promise<boolean> {
   }
 }
 
-function summarize(s: ServerSession): SessionSummary {
+function summarizeLive(s: ServerSession, title?: string): SessionSummary {
+  const name = s.sessionManager.getSessionName?.() as string | undefined;
   return {
     id: s.id,
-    title: s.title,
+    title: (name || title || "New chat").trim() || "New chat",
     createdAt: s.createdAt,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     messageCount: (s.session.messages as any[])?.length ?? 0,
   };
+}
+
+/** Rebuild UI-shaped messages from a session's persisted entries. */
+export async function loadUiMessages(id: string): Promise<UiMessage[] | undefined> {
+  const s = await getSession(id);
+  if (!s) return undefined;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ctx = s.sessionManager.buildSessionContext();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const msgs: any[] = ctx.messages ?? [];
+  const out: UiMessage[] = [];
+  const toolIndex = new Map<string, { msgIdx: number; toolIdx: number }>();
+
+  const contentToText = (content: unknown): string => {
+    if (typeof content === "string") return content;
+    if (Array.isArray(content)) {
+      return content
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .filter((c: any) => c && c.type === "text" && typeof c.text === "string")
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .map((c: any) => c.text)
+        .join("");
+    }
+    return "";
+  };
+
+  for (const m of msgs) {
+    if (m.role === "user") {
+      out.push({
+        id: `u-${out.length}`,
+        role: "user",
+        text: contentToText(m.content),
+        toolCalls: [],
+      });
+    } else if (m.role === "assistant") {
+      const text: string[] = [];
+      const thinking: string[] = [];
+      const toolCalls: UiToolCall[] = [];
+      for (const block of m.content ?? []) {
+        if (block.type === "text") text.push(block.text ?? "");
+        else if (block.type === "thinking") thinking.push(block.thinking ?? "");
+        else if (block.type === "toolCall") {
+          toolCalls.push({
+            id: block.id,
+            name: block.name,
+            input: block.arguments ?? {},
+            output: "",
+            isError: false,
+            done: true,
+          });
+        }
+      }
+      const msgIdx = out.length;
+      out.push({
+        id: `a-${msgIdx}`,
+        role: "assistant",
+        text: text.join(""),
+        thinking: thinking.length ? thinking.join("") : undefined,
+        toolCalls,
+      });
+      toolCalls.forEach((tc, toolIdx) => {
+        toolIndex.set(tc.id, { msgIdx, toolIdx });
+      });
+    } else if (m.role === "toolResult") {
+      const loc = toolIndex.get(m.toolCallId);
+      if (!loc) continue;
+      const parent = out[loc.msgIdx];
+      const tc = parent.toolCalls[loc.toolIdx];
+      parent.toolCalls[loc.toolIdx] = {
+        ...tc,
+        output: contentToText(m.content),
+        isError: Boolean(m.isError),
+        done: true,
+      };
+    }
+  }
+  return out;
 }
 
 /**
@@ -116,14 +256,21 @@ export async function* streamPrompt(
   text: string,
   signal: AbortSignal,
 ): AsyncGenerator<ChatEvent> {
-  const server = getSession(id);
+  const server = await getSession(id);
   if (!server) {
     yield { type: "error", message: "Session not found" };
     return;
   }
-  // Auto-title from first user message
-  if (server.title === "New chat") {
-    server.title = text.slice(0, 60).replace(/\s+/g, " ").trim() || "New chat";
+
+  // Auto-title the session from its first user message if unnamed.
+  try {
+    const existing = server.sessionManager.getSessionName?.();
+    if (!existing) {
+      const title = text.slice(0, 60).replace(/\s+/g, " ").trim();
+      if (title) server.sessionManager.appendSessionInfo(title);
+    }
+  } catch {
+    /* ignore */
   }
 
   const queue: ChatEvent[] = [];
@@ -162,7 +309,7 @@ export async function* streamPrompt(
           break;
         }
         case "tool_execution_start": {
-          const tid = event.toolCallId ?? event.id ?? randomUUID();
+          const tid = event.toolCallId ?? event.id ?? crypto.randomUUID();
           toolBuffers.set(tid, "");
           push({
             type: "tool_start",
