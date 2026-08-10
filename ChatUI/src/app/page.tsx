@@ -342,6 +342,10 @@ export default function Page() {
                   px: 1.5,
                   py: 1,
                   borderRadius: 2,
+                  borderColor: (t) =>
+                    t.palette.mode === "dark"
+                      ? "rgba(255,255,255,0.08)"
+                      : "rgba(0,0,0,0.08)",
                   willChange: "transform, box-shadow, border-color",
                   transformOrigin: "center bottom",
                   transition: (t) =>
@@ -353,7 +357,10 @@ export default function Page() {
                       },
                     ),
                   "&:hover": {
-                    borderColor: (t) => t.palette.text.secondary,
+                    borderColor: (t) =>
+                      t.palette.mode === "dark"
+                        ? "rgba(255,255,255,0.18)"
+                        : "rgba(0,0,0,0.18)",
                   },
                   "&:focus-within": {
                     transform: "translateY(-2px)",
