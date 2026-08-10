@@ -30,17 +30,17 @@ import StreamingCursor from "@/components/StreamingCursor";
 import TypingIndicator from "@/components/TypingIndicator";
 import usePreventIOSContentScroll from "@/lib/usePreventIOSContentScroll";
 import { readSse } from "@/lib/sse";
-import type { ChatEvent, SessionSummary, UiMessage, UiToolCall } from "@/lib/types";
+import {
+  applyChatEvent,
+  beginStream,
+  emptyChat,
+  endStream,
+  type ChatState,
+} from "@/lib/chatReducer";
+import type { SessionSummary, UiMessage } from "@/lib/types";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
 const DRAWER_WIDTH = 280;
-
-type ChatState = {
-  messages: UiMessage[];
-  streaming: boolean;
-};
-
-const emptyChat = (): ChatState => ({ messages: [], streaming: false });
 
 export default function Page() {
   const { mode, toggle } = useContext(ColorModeContext);
@@ -123,17 +123,7 @@ export default function Page() {
     if (!id) return;
     setInput("");
 
-    const userMsg: UiMessage = {
-      id: `u-${Date.now()}`,
-      role: "user",
-      text,
-      toolCalls: [],
-    };
-    updateActive(id, (c) => ({
-      ...c,
-      streaming: true,
-      messages: [...c.messages, userMsg],
-    }));
+    updateActive(id, (c) => beginStream(c, text));
 
     // Update session title in sidebar
     setSessions((prev) =>
@@ -147,46 +137,7 @@ export default function Page() {
     const ac = new AbortController();
     abortRef.current = ac;
 
-    let currentAssistant: UiMessage | null = null;
-    const ensureAssistant = () => {
-      if (currentAssistant) return currentAssistant;
-      currentAssistant = {
-        id: `a-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        role: "assistant",
-        text: "",
-        toolCalls: [],
-        streaming: true,
-      };
-      const msg = currentAssistant;
-      updateActive(id!, (c) => ({ ...c, messages: [...c.messages, msg] }));
-      return currentAssistant;
-    };
-
-    const patchAssistant = (mut: (m: UiMessage) => UiMessage) => {
-      const target = ensureAssistant();
-      updateActive(id!, (c) => ({
-        ...c,
-        messages: c.messages.map((m) => (m.id === target.id ? mut(m) : m)),
-      }));
-    };
-
-    const finalizeAssistant = () => {
-      if (!currentAssistant) return;
-      const target = currentAssistant;
-      updateActive(id!, (c) => ({
-        ...c,
-        messages: c.messages.map((m) =>
-          m.id === target.id
-            ? {
-                ...m,
-                streaming: false,
-                thinkingEndedAt: m.thinkingEndedAt ?? (m.thinking ? Date.now() : undefined),
-              }
-            : m,
-        ),
-      }));
-    };
-
+    let streamError: string | undefined;
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -197,86 +148,14 @@ export default function Page() {
       if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
 
       for await (const ev of readSse(res.body)) {
-        handleEvent(ev);
-      }
-
-      function handleEvent(ev: ChatEvent) {
-        switch (ev.type) {
-          case "message_start":
-            finalizeAssistant();
-            currentAssistant = null;
-            // Create an empty streaming assistant message right away so
-            // the typing indicator renders while we wait for the first
-            // real event.
-            ensureAssistant();
-            break;
-          case "message_end":
-            finalizeAssistant();
-            currentAssistant = null;
-            break;
-          case "text_delta":
-            patchAssistant((m) => ({
-              ...m,
-              text: m.text + ev.delta,
-              // First text delta marks the end of the thinking phase.
-              thinkingEndedAt:
-                m.thinking && !m.thinkingEndedAt ? Date.now() : m.thinkingEndedAt,
-            }));
-            break;
-          case "thinking_delta":
-            patchAssistant((m) => ({
-              ...m,
-              thinking: (m.thinking ?? "") + ev.delta,
-              thinkingStartedAt: m.thinkingStartedAt ?? Date.now(),
-            }));
-            break;
-          case "tool_start": {
-            const tc: UiToolCall = {
-              id: ev.id,
-              name: ev.name,
-              input: ev.input,
-              output: "",
-              isError: false,
-              done: false,
-            };
-            patchAssistant((m) => ({ ...m, toolCalls: [...m.toolCalls, tc] }));
-            break;
-          }
-          case "tool_update":
-            patchAssistant((m) => ({
-              ...m,
-              toolCalls: m.toolCalls.map((t) =>
-                t.id === ev.id ? { ...t, output: t.output + ev.delta } : t,
-              ),
-            }));
-            break;
-          case "tool_end":
-            patchAssistant((m) => ({
-              ...m,
-              toolCalls: m.toolCalls.map((t) =>
-                t.id === ev.id
-                  ? { ...t, output: ev.output || t.output, isError: ev.isError, done: true }
-                  : t,
-              ),
-            }));
-            break;
-          case "error":
-            patchAssistant((m) => ({
-              ...m,
-              text: m.text + `\n\n[error] ${ev.message}`,
-            }));
-            break;
-        }
+        updateActive(id, (c) => applyChatEvent(c, ev));
       }
     } catch (err) {
       const msg = (err as Error).message;
-      if (msg !== "The user aborted a request.") {
-        patchAssistant((m) => ({ ...m, text: m.text + `\n\n[error] ${msg}` }));
-      }
+      if (msg !== "The user aborted a request.") streamError = msg;
     } finally {
-      finalizeAssistant();
+      updateActive(id, (c) => endStream(c, streamError));
       abortRef.current = null;
-      updateActive(id!, (c) => ({ ...c, streaming: false }));
     }
   }, [input, activeId, newChat, updateActive]);
 
