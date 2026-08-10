@@ -17,7 +17,25 @@ export async function GET(req: Request) {
   const db = adminClient();
   const { data: row, error } = await db.from("vms").select("*").eq("user_id", uid).maybeSingle();
   if (error) return NextResponse.json({ error: "db_read_failed" }, { status: 500 });
-  if (!row) return NextResponse.json({ status: "none" });
+
+  // Fetch profile in parallel so we can return credit balance.
+  const { data: profile } = await db
+    .from("profiles")
+    .select("credit_usd_remaining, llm_usage_month_usd")
+    .eq("id", uid)
+    .maybeSingle();
+
+  if (!row) {
+    return NextResponse.json({
+      status: "none",
+      credit: profile
+        ? {
+            usd_remaining: Number(profile.credit_usd_remaining ?? 0),
+            usd_used_month: Number(profile.llm_usage_month_usd ?? 0),
+          }
+        : null,
+    });
+  }
 
   const wg =
     row.wg_client_ip && row.wg_server_pubkey && row.wg_preshared_key && row.wg_endpoint
@@ -47,5 +65,11 @@ export async function GET(req: Request) {
     // phone's wg address) to the right pod, so users can't reach
     // each other's pods even though they all dial the same destination.
     app_url: row.status === "ready" ? "http://10.10.0.1:3000/" : null,
+    credit: profile
+      ? {
+          usd_remaining: Number(profile.credit_usd_remaining ?? 0),
+          usd_used_month: Number(profile.llm_usage_month_usd ?? 0),
+        }
+      : null,
   });
 }

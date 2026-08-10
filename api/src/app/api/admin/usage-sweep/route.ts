@@ -1,18 +1,22 @@
 // POST /api/admin/usage-sweep
 //
 // Called hourly by a Kubernetes CronJob (see k8s/api/cronjob.yaml).
-// Pulls Anthropic usage for each user's key and writes daily rollups
-// into public.llm_usage, updating profiles.llm_usage_month_usd.
 //
-// V1 note: budgets are TRACKED but not ENFORCED. When we're ready to
-// enforce, this handler is the natural place to revoke keys that have
-// blown past `profiles.llm_monthly_cap_usd`.
+// Per user with a real Anthropic key:
+//   1. Fetch their usage from Anthropic's Admin API.
+//   2. Upsert today's rollup into public.llm_usage.
+//   3. Compute month-to-date and store on profiles.llm_usage_month_usd.
+//   4. Decrement profiles.credit_usd_remaining by the *delta* since
+//      last sweep (we compare today's cost against what we already
+//      recorded for today).
+//   5. If credit hits 0, revoke the Anthropic key. The pod stays up so
+//      the user keeps their data; only LLM calls fail.
 //
-// Auth: shared bearer token from ADMIN_SWEEP_TOKEN env. The CronJob's
-// Pod supplies it via an env-var from the same conceptsos-api-secrets.
+// Auth: shared bearer token from ADMIN_SWEEP_TOKEN env.
 
 import { NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase";
+import { revokeUserKey } from "@/lib/anthropic";
 import { env } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
@@ -27,9 +31,11 @@ export async function POST(req: Request) {
 
   const admin = env.anthropicAdminKey();
   if (!admin) {
-    // Shared-key mode: we can't attribute usage back to individual users
-    // via the admin API. Nothing to do until per-user minting is enabled.
-    return NextResponse.json({ ok: true, mode: "shared", note: "per-user usage attribution requires ANTHROPIC_ADMIN_KEY" });
+    return NextResponse.json({
+      ok: true,
+      mode: "shared",
+      note: "per-user usage attribution requires ANTHROPIC_ADMIN_KEY",
+    });
   }
 
   const db = adminClient();
@@ -43,13 +49,25 @@ export async function POST(req: Request) {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const results: Array<{ user: string; ok: boolean; detail?: string }> = [];
+  const results: Array<{ user: string; ok: boolean; detail?: string; revoked?: boolean }> = [];
 
   for (const row of vms ?? []) {
     try {
       const usage = await fetchAnthropicUsage(admin, row.anthropic_key_id!);
-      // Upsert today's row. We overwrite because Anthropic's usage API
-      // reports running totals — we always take the latest reading.
+
+      // How much cost is already recorded for today? The *delta* between
+      // Anthropic's running total and our recorded total is what we
+      // subtract from the user's credit balance this sweep.
+      const { data: prev } = await db
+        .from("llm_usage")
+        .select("cost_usd")
+        .eq("user_id", row.user_id)
+        .eq("day", today)
+        .maybeSingle();
+      const prevCost = Number(prev?.cost_usd ?? 0);
+      const deltaCost = Math.max(0, usage.costUsd - prevCost);
+
+      // Upsert today's row (running totals; overwrite).
       const { error: upErr } = await db.from("llm_usage").upsert(
         {
           user_id: row.user_id,
@@ -62,17 +80,46 @@ export async function POST(req: Request) {
       );
       if (upErr) throw upErr;
 
-      // Refresh the profile's monthly rollup.
+      // Month-to-date rollup.
       const monthStart = today.slice(0, 7) + "-01";
       const { data: month } = await db
         .from("llm_usage")
         .select("cost_usd")
         .eq("user_id", row.user_id)
         .gte("day", monthStart);
-      const total = (month ?? []).reduce((s, r) => s + Number(r.cost_usd ?? 0), 0);
-      await db.from("profiles").update({ llm_usage_month_usd: total }).eq("id", row.user_id);
+      const monthTotal = (month ?? []).reduce((s, r) => s + Number(r.cost_usd ?? 0), 0);
 
-      results.push({ user: row.user_id, ok: true });
+      // Decrement credit by the delta and check for cutoff.
+      const { data: profile } = await db
+        .from("profiles")
+        .select("credit_usd_remaining")
+        .eq("id", row.user_id)
+        .maybeSingle();
+      const prevCredit = Number(profile?.credit_usd_remaining ?? 0);
+      const newCredit = Math.max(0, prevCredit - deltaCost);
+
+      await db
+        .from("profiles")
+        .update({
+          llm_usage_month_usd: monthTotal,
+          credit_usd_remaining: newCredit,
+        })
+        .eq("id", row.user_id);
+
+      let revoked = false;
+      if (prevCredit > 0 && newCredit === 0) {
+        // Just crossed the cutoff. Revoke the Anthropic key so we stop
+        // accruing charges. Mark the key id as "revoked" so the reconcile
+        // loop doesn't try to reuse it if the pod restarts.
+        await revokeUserKey(row.anthropic_key_id!);
+        await db
+          .from("vms")
+          .update({ anthropic_key_id: "revoked-out-of-credit" })
+          .eq("user_id", row.user_id);
+        revoked = true;
+      }
+
+      results.push({ user: row.user_id, ok: true, revoked });
     } catch (e: any) {
       results.push({ user: row.user_id, ok: false, detail: String(e?.message ?? e) });
     }
@@ -87,12 +134,10 @@ interface Usage {
   costUsd: number;
 }
 
-// Placeholder: Anthropic's admin usage API surface changes; wire the real
-// endpoint here once we've verified it against the console. For V1 we
-// return zeroes so the pipeline is wired end-to-end and the DB reflects
-// "everything at 0" until you flip on real attribution.
+// TODO(v1.1): wire to the real Anthropic Admin usage endpoint:
+// https://docs.anthropic.com/en/api/admin-api/usage-cost/get-usage-report-messages
+// Until then we return zeroes so the pipeline is exercised but no user
+// actually gets debited.
 async function fetchAnthropicUsage(_admin: string, _keyId: string): Promise<Usage> {
-  // TODO(v1.1): implement against
-  // https://docs.anthropic.com/en/api/admin-api/usage-cost/get-usage-report-messages
   return { inputTokens: 0, outputTokens: 0, costUsd: 0 };
 }
