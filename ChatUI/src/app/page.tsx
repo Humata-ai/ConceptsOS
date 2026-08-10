@@ -342,12 +342,12 @@ export default function Page() {
                   px: 1.5,
                   py: 0.5,
                   borderRadius: 2,
-                  border: "none",
-                  willChange: "transform, box-shadow",
+                  border: "1px solid rgba(255,255,255,0.12)",
+                  willChange: "transform, box-shadow, border-color",
                   transformOrigin: "center bottom",
                   transition: (t) =>
                     t.transitions.create(
-                      ["transform", "box-shadow", "background-color"],
+                      ["transform", "box-shadow", "border-color", "background-color"],
                       {
                         duration: 180,
                         easing: "cubic-bezier(0.2, 0, 0, 1)",
@@ -355,6 +355,7 @@ export default function Page() {
                     ),
                   "&:focus-within": {
                     transform: "translateY(-2px)",
+                    borderColor: "rgba(255,255,255,0.22)",
                     boxShadow: (t) =>
                       `0 8px 24px -8px ${
                         t.palette.mode === "dark"
