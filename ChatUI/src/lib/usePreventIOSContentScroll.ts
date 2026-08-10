@@ -42,7 +42,11 @@ export default function usePreventIOSContentScroll() {
         }
         el.style.height = `${Math.max(newContentHeight, vvHeight - offsetFromTop)}px`;
       } else if (!isMobileFirefox()) {
-        el.style.height = `${initialContentHeight.current}px`;
+        // Keyboard closed: clear the inline height so the container falls
+        // back to its CSS sizing (top:0 / bottom:0 against the parent).
+        // Hardcoding window.innerHeight here overflows the parent by the
+        // AppBar's height and pushes the input off the bottom of the screen.
+        el.style.height = "";
       }
 
       el.style.bottom = `${Math.max(diffFromInitial, 0)}px`;
@@ -51,8 +55,13 @@ export default function usePreventIOSContentScroll() {
     function onVisualViewportBlur() {
       const el = contentRef.current;
       if (!(el && isIOS())) return;
-      el.style.height = `${window.innerHeight}px`;
-      el.style.bottom = `0px`;
+      // Clear inline overrides so CSS (top:0 / bottom:0) resizes the box
+      // back to the actual parent height. Setting height to
+      // window.innerHeight would overflow the parent by the AppBar height.
+      el.style.height = "";
+      el.style.bottom = "";
+      keyboardIsOpen.current = false;
+      previousDiffFromInitial.current = 0;
     }
 
     window.visualViewport?.addEventListener("resize", onVisualViewportResize);
