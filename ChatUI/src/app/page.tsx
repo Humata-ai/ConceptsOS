@@ -204,6 +204,10 @@ export default function Page() {
           case "message_start":
             finalizeAssistant();
             currentAssistant = null;
+            // Create an empty streaming assistant message right away so
+            // the typing indicator renders while we wait for the first
+            // real event.
+            ensureAssistant();
             break;
           case "message_end":
             finalizeAssistant();
@@ -361,6 +365,11 @@ export default function Page() {
         variant="permanent"
         sx={{
           display: { xs: "none", md: "block" },
+          // Reserve flex space so the fixed-position paper doesn't overlay
+          // the content column. Without these two lines the sidebar visually
+          // covers the leftmost ~DRAWER_WIDTH pixels of every message.
+          width: DRAWER_WIDTH,
+          flexShrink: 0,
           "& .MuiDrawer-paper": {
             width: DRAWER_WIDTH,
             boxSizing: "border-box",
@@ -534,6 +543,8 @@ function MessageView({ message }: { message: UiMessage }) {
 
   return (
     <Box
+      data-testid={isUser ? "user-message" : "assistant-message"}
+      data-streaming={streaming ? "true" : "false"}
       sx={{
         display: "flex",
         justifyContent: isUser ? "flex-end" : "flex-start",
@@ -579,7 +590,7 @@ function MessageView({ message }: { message: UiMessage }) {
               <ToolCard key={t.id} tool={t} />
             ))}
             {message.text && (
-              <Box sx={{ position: "relative" }}>
+              <Box data-testid="assistant-text" sx={{ position: "relative" }}>
                 <Markdown>{message.text}</Markdown>
                 {streaming && <StreamingCursor />}
               </Box>

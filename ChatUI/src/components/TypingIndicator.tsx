@@ -9,6 +9,7 @@ export default function TypingIndicator() {
   return (
     <Box
       aria-label="assistant is thinking"
+      data-testid="typing-indicator"
       sx={{
         display: "inline-flex",
         alignItems: "center",

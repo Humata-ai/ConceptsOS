@@ -35,6 +35,9 @@ export default function ToolCard({ tool }: { tool: UiToolCall }) {
   return (
     <Paper
       variant="outlined"
+      data-testid="tool-card"
+      data-tool-name={tool.name}
+      data-tool-status={status}
       sx={{
         my: 1,
         px: 1.25,

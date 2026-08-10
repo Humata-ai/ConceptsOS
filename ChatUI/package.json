@@ -6,7 +6,9 @@
     "dev": "next dev -H 0.0.0.0 -p 3050",
     "build": "next build",
     "start": "next start -H 0.0.0.0 -p 3050",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@earendil-works/pi-coding-agent": "^0.84.1",
@@ -24,6 +26,7 @@
     "use-stick-to-bottom": "^1.1.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.9.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",

@@ -34,6 +34,8 @@ export default function Reasoning({ text, streaming, startedAt, endedAt }: Props
 
   return (
     <Box
+      data-testid="reasoning"
+      data-reasoning-streaming={streaming ? "true" : "false"}
       sx={{
         my: 1,
         borderLeft: (t) => `2px solid ${t.palette.divider}`,
@@ -66,6 +68,7 @@ export default function Reasoning({ text, streaming, startedAt, endedAt }: Props
       >
         <PsychologyIcon fontSize="small" />
         <Typography
+          data-testid="reasoning-status"
           variant="body2"
           sx={{
             fontWeight: 500,

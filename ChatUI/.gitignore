@@ -5,3 +5,9 @@ out
 *.log
 tsconfig.tsbuildinfo
 .DS_Store
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/

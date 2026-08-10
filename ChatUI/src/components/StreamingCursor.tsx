@@ -10,6 +10,7 @@ export default function StreamingCursor() {
     <Box
       component="span"
       aria-hidden
+      data-testid="streaming-cursor"
       sx={{
         display: "inline-block",
         width: "0.55em",
