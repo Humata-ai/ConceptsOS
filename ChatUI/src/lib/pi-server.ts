@@ -1,7 +1,8 @@
 import "server-only";
 import { homedir } from "node:os";
 import { rm } from "node:fs/promises";
-import type { ChatEvent, SessionSummary, UiMessage, UiToolCall } from "./types";
+import type { ChatEvent, SessionSummary, UiMessage } from "./types";
+import { agentMessagesToUi } from "./messages";
 
 // Lazy import so Next doesn't try to bundle the SDK.
 type PiSdk = typeof import("@earendil-works/pi-coding-agent");
@@ -175,77 +176,8 @@ function summarizeLive(s: ServerSession, title?: string): SessionSummary {
 export async function loadUiMessages(id: string): Promise<UiMessage[] | undefined> {
   const s = await getSession(id);
   if (!s) return undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ctx = s.sessionManager.buildSessionContext();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const msgs: any[] = ctx.messages ?? [];
-  const out: UiMessage[] = [];
-  const toolIndex = new Map<string, { msgIdx: number; toolIdx: number }>();
-
-  const contentToText = (content: unknown): string => {
-    if (typeof content === "string") return content;
-    if (Array.isArray(content)) {
-      return content
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .filter((c: any) => c && c.type === "text" && typeof c.text === "string")
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .map((c: any) => c.text)
-        .join("");
-    }
-    return "";
-  };
-
-  for (const m of msgs) {
-    if (m.role === "user") {
-      out.push({
-        id: `u-${out.length}`,
-        role: "user",
-        text: contentToText(m.content),
-        toolCalls: [],
-      });
-    } else if (m.role === "assistant") {
-      const text: string[] = [];
-      const thinking: string[] = [];
-      const toolCalls: UiToolCall[] = [];
-      for (const block of m.content ?? []) {
-        if (block.type === "text") text.push(block.text ?? "");
-        else if (block.type === "thinking") thinking.push(block.thinking ?? "");
-        else if (block.type === "toolCall") {
-          toolCalls.push({
-            id: block.id,
-            name: block.name,
-            input: block.arguments ?? {},
-            output: "",
-            isError: false,
-            done: true,
-          });
-        }
-      }
-      const msgIdx = out.length;
-      out.push({
-        id: `a-${msgIdx}`,
-        role: "assistant",
-        text: text.join(""),
-        thinking: thinking.length ? thinking.join("") : undefined,
-        toolCalls,
-      });
-      toolCalls.forEach((tc, toolIdx) => {
-        toolIndex.set(tc.id, { msgIdx, toolIdx });
-      });
-    } else if (m.role === "toolResult") {
-      const loc = toolIndex.get(m.toolCallId);
-      if (!loc) continue;
-      const parent = out[loc.msgIdx];
-      const tc = parent.toolCalls[loc.toolIdx];
-      parent.toolCalls[loc.toolIdx] = {
-        ...tc,
-        output: contentToText(m.content),
-        isError: Boolean(m.isError),
-        done: true,
-      };
-    }
-  }
-  return out;
+  return agentMessagesToUi(ctx.messages ?? []);
 }
 
 /**
