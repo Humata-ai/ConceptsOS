@@ -320,9 +320,10 @@ export default function Page() {
         top: 0,
         left: 0,
         right: 0,
-        // 100dvh shrinks when Safari's URL bar is visible, so the input
-        // doesn't disappear behind the URL bar chrome on iOS.
-        height: "100dvh",
+        // svh is the *small* viewport height, computed as if Safari's URL bar
+        // is always visible. It's stable across URL bar show/hide on iOS 26
+        // (where dvh can lag behind), so the input never tucks under the bar.
+        height: "100svh",
         overflow: "hidden",
         bgcolor: "background.default",
       }}
