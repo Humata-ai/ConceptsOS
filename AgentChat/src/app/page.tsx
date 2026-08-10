@@ -367,6 +367,10 @@ export default function Page() {
             flexShrink: 0,
             borderBottom: (t) => `1px solid ${t.palette.divider}`,
             bgcolor: "background.default",
+            // Clear the iOS status bar in the WKWebView wrapper. The native
+            // side sets contentInsetAdjustmentBehavior = .never, so CSS must
+            // add the top safe-area inset itself (b7d6f1b).
+            pt: "env(safe-area-inset-top)",
           }}
         >
           <Toolbar variant="dense" sx={{ minHeight: 48 }}>
