@@ -9,6 +9,15 @@ import type { UiMessage, UiToolCall } from "./types";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMessage = any;
 
+/**
+ * Normalize a raw user message into a session title: take the first 60
+ * chars, collapse runs of whitespace to a single space, and trim. Returns
+ * "" if the input yields nothing usable — callers pick their own fallback.
+ */
+export function deriveTitle(text: string): string {
+  return text.slice(0, 60).replace(/\s+/g, " ").trim();
+}
+
 /** Flatten a message `content` field (string or content-block array) to plain text. */
 export function contentToText(content: unknown): string {
   if (typeof content === "string") return content;

@@ -29,6 +29,7 @@ import {
   type ChatState,
 } from "@/lib/chatReducer";
 import type { SessionSummary, UiMessage } from "@/lib/types";
+import { deriveTitle } from "@/lib/messages";
 import { StickToBottom } from "use-stick-to-bottom";
 
 const DRAWER_WIDTH = 280;
@@ -190,7 +191,7 @@ export default function Page() {
     setSessions((prev) =>
       prev.map((s) =>
         s.id === id && s.title === "New chat"
-          ? { ...s, title: text.slice(0, 60).replace(/\s+/g, " ").trim() || s.title }
+          ? { ...s, title: deriveTitle(text) || s.title }
           : s,
       ),
     );

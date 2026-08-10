@@ -2,7 +2,8 @@ import "server-only";
 import { homedir } from "node:os";
 import { rm } from "node:fs/promises";
 import type { ChatEvent, SessionSummary, UiMessage } from "./types";
-import { agentMessagesToUi } from "./messages";
+import { agentMessagesToUi, deriveTitle } from "./messages";
+import { mapAgentEvent } from "./agentEventMap";
 
 // Lazy import so Next doesn't try to bundle the SDK.
 type PiSdk = typeof import("@earendil-works/pi-coding-agent");
@@ -94,7 +95,7 @@ export async function listSessions(): Promise<SessionSummary[]> {
       id: info.id as string,
       title:
         (info.name as string | undefined)?.trim() ||
-        (info.firstMessage as string | undefined)?.slice(0, 60).replace(/\s+/g, " ").trim() ||
+        deriveTitle((info.firstMessage as string | undefined) ?? "") ||
         "New chat",
       createdAt: new Date(info.created).getTime(),
       messageCount: info.messageCount as number,
@@ -198,7 +199,7 @@ export async function* streamPrompt(
   try {
     const existing = server.sessionManager.getSessionName?.();
     if (!existing) {
-      const title = text.slice(0, 60).replace(/\s+/g, " ").trim();
+      const title = deriveTitle(text);
       if (title) server.sessionManager.appendSessionInfo(title);
     }
   } catch {
@@ -225,74 +226,7 @@ export async function* streamPrompt(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const unsubscribe = server.session.subscribe((event: any) => {
     try {
-      switch (event.type) {
-        case "message_start":
-          push({ type: "message_start" });
-          break;
-        case "message_end":
-          push({ type: "message_end" });
-          break;
-        case "message_update": {
-          const me = event.assistantMessageEvent;
-          if (!me) return;
-          if (me.type === "text_delta") push({ type: "text_delta", delta: me.delta ?? "" });
-          else if (me.type === "thinking_delta")
-            push({ type: "thinking_delta", delta: me.delta ?? "" });
-          break;
-        }
-        case "tool_execution_start": {
-          const tid = event.toolCallId ?? event.id ?? crypto.randomUUID();
-          toolBuffers.set(tid, "");
-          push({
-            type: "tool_start",
-            id: tid,
-            name: event.toolName ?? "tool",
-            input: event.args ?? event.input ?? event.parameters ?? {},
-          });
-          break;
-        }
-        case "tool_execution_update": {
-          const tid = event.toolCallId ?? event.id;
-          if (!tid) return;
-          const delta =
-            event.delta ??
-            event.output ??
-            (typeof event.partialResult === "string"
-              ? event.partialResult
-              : "");
-          if (delta) {
-            toolBuffers.set(tid, (toolBuffers.get(tid) ?? "") + String(delta));
-            push({ type: "tool_update", id: tid, delta: String(delta) });
-          }
-          break;
-        }
-        case "tool_execution_end": {
-          const tid = event.toolCallId ?? event.id;
-          if (!tid) return;
-          let output = toolBuffers.get(tid) ?? "";
-          const result = event.result;
-          if (result?.content && Array.isArray(result.content)) {
-            const texts = result.content
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .filter((c: any) => c.type === "text")
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              .map((c: any) => c.text)
-              .join("");
-            if (texts) output = texts;
-          }
-          push({
-            type: "tool_end",
-            id: tid,
-            output,
-            isError: Boolean(event.isError),
-          });
-          toolBuffers.delete(tid);
-          break;
-        }
-        case "turn_end":
-          push({ type: "turn_end" });
-          break;
-      }
+      for (const ev of mapAgentEvent(event, toolBuffers)) push(ev);
     } catch (err) {
       push({ type: "error", message: (err as Error).message });
     }

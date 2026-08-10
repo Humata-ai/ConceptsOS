@@ -13,6 +13,17 @@ import ErrorIcon from "@mui/icons-material/ErrorOutline";
 import BuildIcon from "@mui/icons-material/BuildOutlined";
 import type { UiToolCall } from "@/lib/types";
 
+type Status = "running" | "error" | "done";
+
+// One accent palette-color per status. Used both as an sx path string
+// (`accent.main`) and as a theme-palette key (`t.palette[accent].main`),
+// so both call sites stay in lockstep.
+const STATUS_ACCENT: Record<Status, "primary" | "error" | "success"> = {
+  running: "primary",
+  error: "error",
+  done: "success",
+};
+
 export default function ToolCard({ tool }: { tool: UiToolCall }) {
   // Auto-expand while running, collapse once done — but respect user override.
   const [userToggled, setUserToggled] = useState(false);
@@ -23,14 +34,8 @@ export default function ToolCard({ tool }: { tool: UiToolCall }) {
 
   const inputStr = safeJson(tool.input);
   const summary = firstLine(inputStr) || "…";
-  const status: "running" | "error" | "done" = tool.isError
-    ? "error"
-    : tool.done
-      ? "done"
-      : "running";
-
-  const accent =
-    status === "error" ? "error.main" : status === "running" ? "primary.main" : "success.main";
+  const status: Status = tool.isError ? "error" : tool.done ? "done" : "running";
+  const accent = STATUS_ACCENT[status];
 
   return (
     <Paper
@@ -44,13 +49,7 @@ export default function ToolCard({ tool }: { tool: UiToolCall }) {
         py: 0.75,
         borderColor: (t) =>
           status === "running" ? t.palette.primary.main : t.palette.divider,
-        borderLeft: (t) => `3px solid ${
-          status === "error"
-            ? t.palette.error.main
-            : status === "running"
-              ? t.palette.primary.main
-              : t.palette.success.main
-        }`,
+        borderLeft: (t) => `3px solid ${t.palette[accent].main}`,
         bgcolor: "transparent",
         transition: "border-color 0.2s ease",
       }}
@@ -63,7 +62,7 @@ export default function ToolCard({ tool }: { tool: UiToolCall }) {
             display: "inline-flex",
             alignItems: "center",
             justifyContent: "center",
-            color: accent,
+            color: `${accent}.main`,
             flexShrink: 0,
           }}
         >
