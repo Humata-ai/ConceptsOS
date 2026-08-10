@@ -53,21 +53,22 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 # 1. Pick device.
 if [[ -z "${DEVICE_ID:-}" ]]; then
   echo "==> Auto-detecting paired device"
-  mapfile -t IDS < <(xcrun devicectl list devices 2>/dev/null \
+  IDS_RAW=$(xcrun devicectl list devices 2>/dev/null \
     | awk '/available/ && /paired/ {
         for (i=1;i<=NF;i++) if ($i ~ /^[0-9A-F]{8}-[0-9A-F-]+$/) print $i
       }' \
     | sort -u)
-  if [[ ${#IDS[@]} -eq 0 ]]; then
+  IDS_COUNT=$(printf '%s\n' "$IDS_RAW" | sed '/^$/d' | wc -l | tr -d ' ')
+  if [[ "$IDS_COUNT" -eq 0 ]]; then
     echo "FAIL: no paired iOS device found. Plug in via USB, tap Trust, and retry." >&2
     exit 2
   fi
-  if [[ ${#IDS[@]} -gt 1 ]]; then
+  if [[ "$IDS_COUNT" -gt 1 ]]; then
     echo "FAIL: multiple paired devices — set DEVICE_ID explicitly. Found:" >&2
     xcrun devicectl list devices | sed 's/^/  /' >&2
     exit 2
   fi
-  DEVICE_ID="${IDS[0]}"
+  DEVICE_ID=$(printf '%s\n' "$IDS_RAW" | sed '/^$/d' | head -n1)
 fi
 echo "==> Using device: $DEVICE_ID"
 
