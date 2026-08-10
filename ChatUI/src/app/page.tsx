@@ -332,7 +332,7 @@ export default function Page() {
               }}
             >
               <Paper
-                variant="outlined"
+                elevation={0}
                 sx={{
                   maxWidth: 780,
                   mx: "auto",
@@ -342,32 +342,19 @@ export default function Page() {
                   px: 1.5,
                   py: 0.5,
                   borderRadius: 2,
-                  borderColor: (t) =>
-                    t.palette.mode === "dark"
-                      ? "rgba(255,255,255,0.08)"
-                      : "rgba(0,0,0,0.08)",
-                  willChange: "transform, box-shadow, border-color",
+                  border: "none",
+                  willChange: "transform, box-shadow",
                   transformOrigin: "center bottom",
                   transition: (t) =>
                     t.transitions.create(
-                      ["transform", "box-shadow", "border-color", "background-color"],
+                      ["transform", "box-shadow", "background-color"],
                       {
                         duration: 180,
                         easing: "cubic-bezier(0.2, 0, 0, 1)",
                       },
                     ),
-                  "&:hover": {
-                    borderColor: (t) =>
-                      t.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.18)"
-                        : "rgba(0,0,0,0.18)",
-                  },
                   "&:focus-within": {
                     transform: "translateY(-2px)",
-                    borderColor: (t) =>
-                      t.palette.mode === "dark"
-                        ? "rgba(255,255,255,0.28)"
-                        : "rgba(0,0,0,0.28)",
                     boxShadow: (t) =>
                       `0 8px 24px -8px ${
                         t.palette.mode === "dark"
