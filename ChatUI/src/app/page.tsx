@@ -373,16 +373,28 @@ export default function Page() {
           </Toolbar>
         </AppBar>
 
-        {/* Content container the iOS keyboard hook resizes on focus. */}
+        {/* Outer box holds the flex slot; inner absolute box is what the
+            iOS keyboard hook resizes/shifts. Absolute positioning lets the
+            hook's inline height/bottom take effect without fighting flex. */}
         <Box
-          ref={contentRef}
           sx={{
             flex: 1,
             position: "relative",
+            overflow: "hidden",
+          }}
+        >
+        <Box
+          ref={contentRef}
+          sx={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
             display: "flex",
             flexDirection: "column",
             overflow: "hidden",
-            transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
+            transition: "height 0.25s cubic-bezier(0.32, 0.72, 0, 1), bottom 0.25s cubic-bezier(0.32, 0.72, 0, 1)",
           }}
         >
           <Box
@@ -452,6 +464,7 @@ export default function Page() {
             )}
           </Paper>
           </Box>
+        </Box>
         </Box>
       </Box>
     </Box>
