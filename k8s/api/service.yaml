@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: conceptsos-api
+  namespace: conceptsos-system
+  labels: { app: conceptsos-api }
+spec:
+  type: ClusterIP
+  selector: { app: conceptsos-api }
+  ports:
+    - name: http
+      port: 80
+      targetPort: 3100
+      protocol: TCP

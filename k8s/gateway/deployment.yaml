@@ -1,0 +1,79 @@
+# wg-gateway: one shared WireGuard endpoint for all users.
+#
+# Public UDP :51820 (via LoadBalancer). Internal admin API on :8080 for
+# the api service to add/remove peers.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wg-gateway
+  namespace: conceptsos-system
+  labels:
+    app: wg-gateway
+    app.kubernetes.io/part-of: conceptsos
+spec:
+  # Only one replica can hold the LB IP and wg peer table at a time.
+  # Rolling would briefly split-brain the peer state.
+  strategy:
+    type: Recreate
+  replicas: 1
+  selector:
+    matchLabels: { app: wg-gateway }
+  template:
+    metadata:
+      labels: { app: wg-gateway }
+    spec:
+      containers:
+        - name: gateway
+          image: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/wg-gateway:latest
+          imagePullPolicy: Always
+          ports:
+            - name: wg
+              containerPort: 51820
+              protocol: UDP
+            - name: admin
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: WG_CLIENT_SUBNET
+              value: "10.10.0.0/16"
+            - name: WG_GATEWAY_ADDR
+              value: "10.10.0.1/16"
+            - name: WG_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: wg-gateway-admin
+                  key: token
+          # NET_ADMIN + SYS_MODULE for wg + iptables. Kernel WireGuard is
+          # built into GKE COS since 1.24, so no /dev/net/tun needed.
+          securityContext:
+            capabilities:
+              add: ["NET_ADMIN", "SYS_MODULE"]
+          volumeMounts:
+            - name: state
+              mountPath: /var/lib/wg-gateway
+          readinessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 8080 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "100m", memory: "128Mi" }
+            limits:   { cpu: "1",    memory: "512Mi" }
+      volumes:
+        - name: state
+          persistentVolumeClaim:
+            claimName: wg-gateway-state
+---
+# Persistent volume for the wg server keypair and peer table so the
+# gateway survives restarts without rotating keys under users' feet.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: wg-gateway-state
+  namespace: conceptsos-system
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: { requests: { storage: 1Gi } }

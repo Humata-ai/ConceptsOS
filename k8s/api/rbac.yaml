@@ -1,0 +1,66 @@
+# ServiceAccount + RBAC for the api pod. It needs to create/read/delete
+# StatefulSets, Services, Secrets, and PVCs in the `users` namespace, plus
+# read Pods (for readiness checks).
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: conceptsos-api
+  namespace: conceptsos-system
+---
+# Namespaced role in the `users` namespace where user pods live.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: conceptsos-api-users
+  namespace: users
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list"]
+  - apiGroups: [""]
+    resources: ["services", "secrets", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: conceptsos-api-users
+  namespace: users
+subjects:
+  - kind: ServiceAccount
+    name: conceptsos-api
+    namespace: conceptsos-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: conceptsos-api-users
+---
+# Cluster-scoped read for namespaces (to create `users` if missing).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: conceptsos-api-namespaces
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: conceptsos-api-namespaces
+subjects:
+  - kind: ServiceAccount
+    name: conceptsos-api
+    namespace: conceptsos-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: conceptsos-api-namespaces

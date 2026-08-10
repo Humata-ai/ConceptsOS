@@ -1,0 +1,38 @@
+# Two Services for the wg-gateway pod:
+#
+#  * wg-gateway-public — LoadBalancer, UDP :51820. This is the public
+#    endpoint at api.conceptsos.com (via DNS A record).
+#  * wg-gateway        — ClusterIP, TCP :8080. Internal admin API called
+#    by the api service.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wg-gateway-public
+  namespace: conceptsos-system
+  labels: { app: wg-gateway }
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Local  # preserve client source IP, though wg
+                                # doesn't care since it's UDP w/ crypto
+  selector: { app: wg-gateway }
+  ports:
+    - name: wg
+      port: 51820
+      targetPort: 51820
+      protocol: UDP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: wg-gateway
+  namespace: conceptsos-system
+  labels: { app: wg-gateway }
+spec:
+  type: ClusterIP
+  selector: { app: wg-gateway }
+  ports:
+    - name: admin
+      port: 8080
+      targetPort: 8080
+      protocol: TCP

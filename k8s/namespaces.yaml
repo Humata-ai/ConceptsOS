@@ -1,0 +1,18 @@
+# ConceptsOS namespaces.
+#
+# conceptsos-system : the shared control plane — api service, wg-gateway.
+# users             : per-user StatefulSets (one per signup).
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: conceptsos-system
+  labels:
+    app.kubernetes.io/part-of: conceptsos
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: users
+  labels:
+    app.kubernetes.io/part-of: conceptsos

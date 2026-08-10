@@ -1,0 +1,31 @@
+{
+  "name": "conceptsos-api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ConceptsOS provisioning API + in-cluster reconcile loop. Public entry point at api.conceptsos.com.",
+  "scripts": {
+    "dev": "next dev -H 0.0.0.0 -p 3100",
+    "build": "next build",
+    "start": "next start -H 0.0.0.0 -p 3100",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.32.1",
+    "@kubernetes/client-node": "^0.22.3",
+    "@supabase/supabase-js": "^2.47.10",
+    "next": "^15.0.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.10"
+  }
+}

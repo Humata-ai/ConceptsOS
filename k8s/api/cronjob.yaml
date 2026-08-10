@@ -1,0 +1,33 @@
+# Hourly LLM usage sweep. Hits the api service's own admin endpoint,
+# authenticated with ADMIN_SWEEP_TOKEN from conceptsos-api-secrets.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: conceptsos-usage-sweep
+  namespace: conceptsos-system
+spec:
+  schedule: "17 * * * *"   # hourly, at :17 to avoid the top-of-hour crowd
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: sweep
+              image: curlimages/curl:8.10.1
+              env:
+                - name: ADMIN_SWEEP_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: conceptsos-api-secrets
+                      key: ADMIN_SWEEP_TOKEN
+              command:
+                - sh
+                - -c
+                - >-
+                  curl -sfS -X POST
+                  -H "Authorization: Bearer ${ADMIN_SWEEP_TOKEN}"
+                  http://conceptsos-api.conceptsos-system.svc.cluster.local/api/admin/usage-sweep

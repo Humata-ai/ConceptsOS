@@ -1,0 +1,36 @@
+# Public HTTPS ingress for api.conceptsos.com.
+#
+# Uses a GCE Ingress with a Google-managed cert. DNS: A record for
+# api.conceptsos.com points at the static IP `conceptsos-api-ip`
+# (reserved via Terraform).
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: conceptsos-api-cert
+  namespace: conceptsos-system
+spec:
+  domains:
+    - api.conceptsos.com
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: conceptsos-api
+  namespace: conceptsos-system
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    kubernetes.io/ingress.global-static-ip-name: "conceptsos-api-ip"
+    networking.gke.io/managed-certificates: "conceptsos-api-cert"
+    kubernetes.io/ingress.allow-http: "false"
+spec:
+  rules:
+    - host: api.conceptsos.com
+      http:
+        paths:
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: conceptsos-api
+                port: { number: 80 }

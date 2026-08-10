@@ -1,0 +1,9 @@
+{
+  "name": "wg-gateway",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "ConceptsOS WireGuard gateway control plane.",
+  "main": "src/server.js",
+  "dependencies": {}
+}

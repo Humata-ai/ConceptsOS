@@ -1,0 +1,61 @@
+# api.conceptsos.com — provisioning API + in-cluster reconcile loop.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: conceptsos-api
+  namespace: conceptsos-system
+  labels:
+    app: conceptsos-api
+    app.kubernetes.io/part-of: conceptsos
+spec:
+  # Reconcile is idempotent; two replicas is fine but for V1 stick with 1
+  # to keep logs simple and avoid duplicate Anthropic key mints.
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+  selector:
+    matchLabels: { app: conceptsos-api }
+  template:
+    metadata:
+      labels: { app: conceptsos-api }
+    spec:
+      serviceAccountName: conceptsos-api
+      containers:
+        - name: api
+          image: us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/api:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3100
+          env:
+            - name: PORT
+              value: "3100"
+            - name: K8S_USERS_NAMESPACE
+              value: "users"
+            - name: USER_POD_IMAGE
+              value: "us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/vm:latest"
+            - name: USER_POD_STORAGE_GB
+              value: "10"
+            - name: WG_CLIENT_SUBNET
+              value: "10.10.0.0/16"
+            - name: WG_ENDPOINT
+              value: "api.conceptsos.com:51820"
+            - name: WG_GATEWAY_URL
+              value: "http://wg-gateway.conceptsos-system.svc.cluster.local:8080"
+            - name: RECONCILE_ENABLED
+              value: "true"
+            - name: RECONCILE_INTERVAL_MS
+              value: "5000"
+          envFrom:
+            - secretRef: { name: conceptsos-api-secrets }
+          readinessProbe:
+            httpGet: { path: /api/health, port: 3100 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /api/health, port: 3100 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+          resources:
+            requests: { cpu: "100m", memory: "256Mi" }
+            limits:   { cpu: "1",    memory: "1Gi" }

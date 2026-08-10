@@ -13,3 +13,16 @@ app/node_modules/
 app/.next/
 ChatUI/node_modules/
 ChatUI/.next/
+
+# api service (Next.js)
+api/node_modules/
+api/.next/
+api/.env.local
+api/.env
+api/*.tsbuildinfo
+
+# wg-gateway
+docker/wg-gateway/node_modules/
+
+# supabase local
+supabase/.temp/

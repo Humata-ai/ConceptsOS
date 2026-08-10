@@ -1,42 +1,64 @@
 #!/usr/bin/env bash
 #
-# Bring up wg0 from the config mounted at /etc/wireguard-src/wg0.conf
-# (a k8s Secret projected read-only), then bind Next.js to the tunnel IP.
+# ConceptsOS-VM entrypoint. Branches on CONCEPTSOS_WG:
+#
+#   external — default in our hosted deployment. No wg in the container.
+#              Bind Next.js to 0.0.0.0 on $PORT. The shared wg-gateway
+#              handles VPN termination outside the pod.
+#
+#   embedded — self-hosters. Bring up wg0 from a mounted wg0.conf, then
+#              bind Next.js to the wg0 tunnel IP so the app is only
+#              reachable to authorized WireGuard peers.
 
 set -euo pipefail
 
 log() { echo "[entrypoint $(date -u +%H:%M:%S)] $*" >&2; }
 
-SRC_CONF="${WG_CONF:-/etc/wireguard-src/wg0.conf}"
-DST_CONF="/etc/wireguard/wg0.conf"
+MODE="${CONCEPTSOS_WG:-external}"
+PORT="${PORT:-3000}"
 
-if [[ ! -f "$SRC_CONF" ]]; then
-  log "no WireGuard config at $SRC_CONF"
-  log "run bin/wg-bootstrap.sh to generate one and create the k8s Secret"
-  exit 1
-fi
+case "$MODE" in
+  external)
+    log "wg mode: external (no in-container VPN)"
+    export HOSTNAME="0.0.0.0"
+    export PORT
+    log "starting Next.js on ${HOSTNAME}:${PORT}"
+    exec node /app/server.js
+    ;;
 
-# wg-quick refuses world-readable configs and writes state next to the file,
-# so copy the projected read-only Secret into a writable location first.
-install -d -m 0700 /etc/wireguard
-install -m 0600 "$SRC_CONF" "$DST_CONF"
+  embedded)
+    log "wg mode: embedded (in-container wg-quick)"
+    SRC_CONF="${WG_CONF:-/etc/wireguard-src/wg0.conf}"
+    DST_CONF="/etc/wireguard/wg0.conf"
 
-log "bringing up wg0"
-wg-quick up wg0
+    if [[ ! -f "$SRC_CONF" ]]; then
+      log "no WireGuard config at $SRC_CONF"
+      log "mount one at /etc/wireguard-src/wg0.conf (or set WG_CONF)"
+      exit 1
+    fi
 
-WG_IP=$(ip -4 addr show wg0 | awk '/inet /{print $2}' | cut -d/ -f1 | head -n1)
-if [[ -z "$WG_IP" ]]; then
-  log "wg0 came up but has no IPv4 address"; exit 1
-fi
-log "wg0 = $WG_IP"
+    install -d -m 0700 /etc/wireguard
+    install -m 0600 "$SRC_CONF" "$DST_CONF"
 
-# Bind Next.js to the tunnel IP so it is unreachable from anywhere but wg0 peers.
-export HOSTNAME="$WG_IP"
-export PORT="${PORT:-3000}"
-log "starting Next.js on ${HOSTNAME}:${PORT}"
+    log "bringing up wg0"
+    wg-quick up wg0
 
-# Clean shutdown: tear the interface down on SIGTERM/EXIT so a rolling
-# restart doesn't leave an orphaned wg0 in the pod's netns.
-trap 'log "shutting down"; wg-quick down wg0 2>/dev/null || true' EXIT
+    WG_IP=$(ip -4 addr show wg0 | awk '/inet /{print $2}' | cut -d/ -f1 | head -n1)
+    if [[ -z "$WG_IP" ]]; then
+      log "wg0 came up but has no IPv4 address"; exit 1
+    fi
+    log "wg0 = $WG_IP"
 
-exec node /app/server.js
+    export HOSTNAME="$WG_IP"
+    export PORT
+    log "starting Next.js on ${HOSTNAME}:${PORT}"
+
+    trap 'log "shutting down"; wg-quick down wg0 2>/dev/null || true' EXIT
+    exec node /app/server.js
+    ;;
+
+  *)
+    log "unknown CONCEPTSOS_WG mode: $MODE (want external|embedded)"
+    exit 1
+    ;;
+esac
