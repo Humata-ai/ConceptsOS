@@ -340,7 +340,7 @@ export default function Page() {
                   alignItems: "center",
                   gap: 1,
                   px: 1.5,
-                  py: 1,
+                  py: 0.5,
                   borderRadius: 2,
                   borderColor: (t) =>
                     t.palette.mode === "dark"
@@ -399,7 +399,7 @@ export default function Page() {
                     fontSize: 16,
                     // Center the text vertically within the composer row
                     // (MUI's default multiline textarea has asymmetric padding).
-                    "& textarea": { py: 0.75 },
+                    "& textarea": { py: 0.25 },
                   }}
                 />
                 {streaming ? (
