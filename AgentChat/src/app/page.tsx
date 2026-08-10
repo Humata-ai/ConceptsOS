@@ -43,18 +43,8 @@ const iOS =
   /iPad|iPhone|iPod/.test(navigator.userAgent) &&
   !("MSStream" in window);
 
-// TEMPORARY smoke-test: Dan asked me to verify that a code change to
-// AgentChat actually rides through the ConceptsOS-VM build+push+pod-roll
-// pipeline and shows up on his phone. If he sees this alert on load,
-// the pipeline works. Delete this after verifying (2026-08-10).
-const POD_BUILD_MARKER = "POD_BUILD_ALPHA_2026-08-10-12-35";
-
 export default function Page() {
   const { mode, toggle } = useContext(ColorModeContext);
-  useEffect(() => {
-    // eslint-disable-next-line no-alert
-    alert(POD_BUILD_MARKER);
-  }, []);
   const [drawerOpen, setDrawerOpen] = useState(false);
   // When the user swipes the drawer open via useGlobalSwipeToOpen, we've
   // already animated the paper to translateX(0) ourselves. We need MUI's
@@ -369,26 +359,6 @@ export default function Page() {
         {sidebar}
       </SwipeableDrawer>
 
-      {/* TEMPORARY smoke-test banner (2026-08-10). Impossible to miss. */}
-      <Box
-        sx={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 99999,
-          bgcolor: "red",
-          color: "white",
-          fontWeight: 700,
-          textAlign: "center",
-          py: 1,
-          fontSize: 14,
-          pointerEvents: "none",
-        }}
-      >
-        {POD_BUILD_MARKER}
-      </Box>
-
       <Box sx={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
         <AppBar
           position="static"
@@ -413,7 +383,7 @@ export default function Page() {
               <MenuIcon fontSize="small" />
             </IconButton>
             <Typography variant="body2" sx={{ flex: 1, color: "text.secondary" }} noWrap>
-              {POD_BUILD_MARKER} — {sessions.find((s) => s.id === activeId)?.title ?? "New chat"}
+              {sessions.find((s) => s.id === activeId)?.title ?? "New chat"}
             </Typography>
           </Toolbar>
         </AppBar>
@@ -463,7 +433,7 @@ export default function Page() {
                 <Box sx={{ maxWidth: 780, mx: "auto", px: { xs: 0, md: 1.5 } }}>
                   {activeChat.messages.length === 0 && !hydrating && (
                     <Typography color="text.secondary" sx={{ mt: 4, textAlign: "center" }}>
-                      {POD_BUILD_MARKER}
+                      Ask anything.
                     </Typography>
                   )}
                   <Stack spacing={2}>

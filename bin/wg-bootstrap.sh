@@ -37,7 +37,7 @@ need kubectl
 
 # `wg` may not be installed on the operator's machine. Fall back to running
 # it inside the app image (which ships wireguard-tools).
-WG_IMAGE="${WG_IMAGE:-us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/app:latest}"
+WG_IMAGE="${WG_IMAGE:-us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/vm:latest}"
 if command -v wg >/dev/null; then
   wg_() { wg "$@"; }
 else

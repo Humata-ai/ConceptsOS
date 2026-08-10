@@ -8,9 +8,13 @@ kubectl apply -f k8s/gateway/
 kubectl apply -f k8s/api/
 ```
 
-The old single-tenant `_legacy-*.yaml` manifests are kept for the
-self-host path (one pod, one wg, one user) but are NOT applied to the
-hosted GKE cluster in V1.
+The old single-tenant `_legacy-*.yaml` manifests were retired on
+2026-08-10 — the hosted deployment is entirely multi-tenant now (each
+user gets their own StatefulSet in the `users` namespace, all sharing
+the wg-gateway in `conceptsos-system`). If you need the single-user
+self-host path, run the `ConceptsOS-VM` image directly with
+`CONCEPTSOS_WG=embedded` and a mounted `wg0.conf` — see the top-level
+README's "Self-hosting" section.
 
 ## Layout
 

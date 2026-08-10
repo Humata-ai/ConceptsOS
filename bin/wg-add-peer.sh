@@ -22,7 +22,7 @@ fi
 SERVER_PRIV=$(cat "$STATE_DIR/server.key")
 SERVER_PUB=$(cat "$STATE_DIR/server.pub")
 
-WG_IMAGE="${WG_IMAGE:-us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/app:latest}"
+WG_IMAGE="${WG_IMAGE:-us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/vm:latest}"
 if command -v wg >/dev/null; then
   wg_() { wg "$@"; }
 else

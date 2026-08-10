@@ -25,6 +25,19 @@ struct SetupTunnelView: View {
                 Text("ConceptsOS runs your personal computer inside a private tunnel. Import this config into the WireGuard app once — after that everything works automatically.")
                     .foregroundStyle(.secondary)
 
+                // Migration notice (2026-08-10): the pre-multi-tenant
+                // deployment used a single shared LoadBalancer at
+                // 34.41.131.163. The new setup gives each user their own
+                // pod behind the shared wg-gateway at 35.253.153.78.
+                // If a device still has the old tunnel active it will
+                // silently talk to the legacy pod and see stale content.
+                Text("New in this build: multi-tenant ConceptsOS. Each user runs in their own pod behind a shared WireGuard gateway (endpoint 35.253.153.78). If you already have an older “ConceptsOS” profile in the WireGuard app pointing at 34.41.131.163, delete it before importing the new one below — otherwise your phone will keep hitting the retired legacy tunnel.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .padding(12)
+                    .background(Color.yellow.opacity(0.15))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
                 if let cfg = fullConfigText {
                     if let qrImage = qr(from: cfg) {
                         HStack {
@@ -43,9 +56,10 @@ struct SetupTunnelView: View {
                         Text("Steps")
                             .font(.headline)
                         Label("Install the free “WireGuard” app from the App Store.", systemImage: "1.circle.fill")
-                        Label("Open it, tap +, then “Create from QR code” and scan the code above.", systemImage: "2.circle.fill")
-                        Label("Toggle the new profile ON.", systemImage: "3.circle.fill")
-                        Label("Return here and tap “I'm connected”.", systemImage: "4.circle.fill")
+                        Label("Delete any older “ConceptsOS” profile first (endpoint 34.41.131.163 — that’s the retired legacy tunnel).", systemImage: "2.circle.fill")
+                        Label("Tap +, then “Create from QR code” and scan the code above.", systemImage: "3.circle.fill")
+                        Label("Toggle the new profile ON.", systemImage: "4.circle.fill")
+                        Label("Return here and tap “I'm connected”.", systemImage: "5.circle.fill")
                     }
 
                     Button {

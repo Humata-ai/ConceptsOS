@@ -79,9 +79,11 @@ See `api/.env.example`.
 
 ## Self-hosting (single-user)
 
-The old single-tenant "one pod is my personal appliance" model still
-works — set `CONCEPTSOS_WG=embedded` on the `ConceptsOS-VM` image and
-apply `k8s/_legacy-*.yaml`. See `bin/wg-bootstrap.sh` for peer setup.
+The single-tenant "one pod is my personal appliance" model still
+works — run the `ConceptsOS-VM` image with `CONCEPTSOS_WG=embedded`
+and a `wg0.conf` mounted at `/etc/wireguard-src/wg0.conf`. The
+`docker/entrypoint.sh` will bring up `wg0` and bind Next.js to the
+tunnel IP. See `bin/wg-bootstrap.sh` for peer setup.
 
 ## License
 
