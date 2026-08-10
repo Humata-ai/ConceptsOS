@@ -1,7 +1,6 @@
 html, body {
   height: 100%;
   margin: 0;
-  background-color: red;
   overflow: hidden;
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
