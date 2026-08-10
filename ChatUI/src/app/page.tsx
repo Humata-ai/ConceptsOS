@@ -317,7 +317,12 @@ export default function Page() {
       sx={{
         display: "flex",
         position: "fixed",
-        inset: 0,
+        top: 0,
+        left: 0,
+        right: 0,
+        // 100dvh shrinks when Safari's URL bar is visible, so the input
+        // doesn't disappear behind the URL bar chrome on iOS.
+        height: "100dvh",
         overflow: "hidden",
         bgcolor: "background.default",
       }}
@@ -420,7 +425,15 @@ export default function Page() {
             </Box>
           </Box>
 
-          <Box sx={{ borderTop: (t) => `1px solid ${t.palette.divider}`, p: 1.5, flexShrink: 0 }}>
+          <Box
+            sx={{
+              borderTop: (t) => `1px solid ${t.palette.divider}`,
+              px: 1.5,
+              pt: 1.5,
+              pb: "calc(12px + env(safe-area-inset-bottom))",
+              flexShrink: 0,
+            }}
+          >
           <Paper
             variant="outlined"
             sx={{
