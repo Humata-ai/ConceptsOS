@@ -20,7 +20,7 @@ import SwiftUI
 struct InstallTunnelView: View {
     @EnvironmentObject var vmState: VMStateStore
     @EnvironmentObject var auth: AuthManager
-    @StateObject private var tunnel = TunnelManager()
+    @EnvironmentObject var tunnel: TunnelManager
 
     @State private var errorMessage: String?
     @State private var didKickOff = false

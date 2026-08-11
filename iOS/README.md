@@ -14,11 +14,20 @@ via TestFlight.
 ```
 ContentView.swift picks one of:
 
-  auth.session == nil                     → WelcomeView
-  session, but VM not ready               → ProvisioningView
-  VM ready, tunnel not up                 → InstallTunnelView  (in-app WG install + connect)
-  VM ready, tunnel connected              → WebAppView         (WKWebView on 10.10.0.1:3000)
+  auth.session == nil                          → WelcomeView
+  session, but VM not ready                    → ProvisioningView
+  VM ready, tunnel not installed               → InstallTunnelView    (in-app WG install + connect)
+  tunnel installed but currently disconnected  → VPNDisconnectedView  (Reconnect / Open Settings)
+  tunnel installed AND connected               → WebAppView           (WKWebView on 10.10.0.1:3000)
 ```
+
+`vmState.tunnelInstalled` records whether we've ever completed the
+first-run install-and-connect flow. The *live* connection state comes
+from the shared `TunnelManager` env object — if iOS reports the
+tunnel isn't up (user toggled VPN off, iOS tore it down, profile
+deleted…), ContentView renders `VPNDisconnectedView` instead of a
+broken WKWebView pointed at an unreachable 10.10.0.1.
+
 
 State lives in two `@StateObject`s at the App level:
 
@@ -54,6 +63,9 @@ iOS/ConceptsOS/ConceptsOS/
 │   ├── InstallTunnelView.swift       auto-installs the VPN profile,
 │                                     handles the iOS "Allow VPN" prompt,
 │                                     starts the tunnel
+│   ├── VPNDisconnectedView.swift     shown when the tunnel is installed
+│                                     but not currently connected —
+│                                     Reconnect / Open Settings / Sign out
 │   └── WebAppView.swift              WKWebView
 └── WebView.swift                     UIViewRepresentable wrapper
 

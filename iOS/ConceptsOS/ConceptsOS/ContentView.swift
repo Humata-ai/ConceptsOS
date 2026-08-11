@@ -1,19 +1,27 @@
 // Top-level state machine for the app.
 //
-//   signed out                    → WelcomeView
-//   signed in, no VM ready        → ProvisioningView  (polls /api/vm)
-//   VM ready, tunnel not connected → InstallTunnelView (auto-installs +
-//                                                       connects the
-//                                                       bundled WG
-//                                                       extension)
-//   fully set up                   → WebAppView        (WKWebView on
-//                                                       10.10.0.1:3000)
+//   signed out                                      → WelcomeView
+//   signed in, no VM ready                          → ProvisioningView  (polls /api/vm)
+//   VM ready, tunnel not installed                  → InstallTunnelView (auto-installs +
+//                                                                       connects the bundled
+//                                                                       WG extension)
+//   tunnel installed but currently disconnected     → VPNDisconnectedView
+//   tunnel installed AND connected                  → WebAppView        (WKWebView on
+//                                                                        10.10.0.1:3000)
+//
+// Note: `vmState.tunnelInstalled` only tracks whether we've ever
+// completed the install-and-first-connect flow. The *live* connection
+// state comes from the shared `TunnelManager` (`tunnel.state`). If iOS
+// tears the tunnel down (user toggled VPN off, battery, profile
+// deleted, etc.) we swap to VPNDisconnectedView instead of rendering
+// a WKWebView that can't reach 10.10.0.1.
 
 import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var auth: AuthManager
     @EnvironmentObject var vmState: VMStateStore
+    @EnvironmentObject var tunnel: TunnelManager
 
     var body: some View {
         Group {
@@ -23,16 +31,33 @@ struct ContentView: View {
                 ProvisioningView()
             } else if !vmState.tunnelInstalled {
                 InstallTunnelView()
-            } else {
+            } else if isTunnelLive {
                 WebAppView(url: URL(string: vmState.appURL ?? AppConfig.podURL)!)
+            } else {
+                VPNDisconnectedView()
             }
         }
         .animation(.easeInOut(duration: 0.2), value: auth.session)
         .animation(.easeInOut(duration: 0.2), value: vmState.tunnelInstalled)
+        .animation(.easeInOut(duration: 0.2), value: isTunnelLive)
+        // Keep tunnel state fresh whenever the app comes back to the
+        // foreground — the user may have toggled VPN in Settings while
+        // we were backgrounded.
+        .task { await tunnel.refresh() }
     }
 
     private var isVMReady: Bool {
         vmState.appURL != nil && vmState.wg != nil
+    }
+
+    /// True iff the WireGuard tunnel is currently up (or racing up).
+    /// We treat `.connecting` as "live" so we don't flash the
+    /// disconnected page every time iOS reasserts the tunnel.
+    private var isTunnelLive: Bool {
+        switch tunnel.state {
+        case .connected, .connecting: return true
+        default: return false
+        }
     }
 }
 
@@ -40,4 +65,5 @@ struct ContentView: View {
     ContentView()
         .environmentObject(AuthManager())
         .environmentObject(VMStateStore())
+        .environmentObject(TunnelManager())
 }

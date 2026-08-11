@@ -245,6 +245,13 @@ if app_views_group && !app_views_group.files.any? { |f| f.path == "InstallTunnel
   puts "+ added InstallTunnelView.swift to app target"
 end
 
+if app_views_group && !app_views_group.files.any? { |f| f.path == "VPNDisconnectedView.swift" }
+  ref = app_views_group.new_reference("VPNDisconnectedView.swift")
+  ref.last_known_file_type = "sourcecode.swift"
+  app_target.source_build_phase.add_file_reference(ref)
+  puts "+ added VPNDisconnectedView.swift to app target"
+end
+
 app_wg_group = project.main_group.recursive_children.find { |g| g.is_a?(Xcodeproj::Project::Object::PBXGroup) && g.path == "WireGuard" }
 if app_wg_group
   {
