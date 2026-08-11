@@ -35,8 +35,17 @@ EXT_BUNDLE_ID         = "ai.humata.ConceptsOS.WGTunnel"
 APP_BUNDLE_ID         = "ai.humata.ConceptsOS"
 APP_GROUP             = "group.ai.humata.ConceptsOS"
 TEAM_ID               = "2U53525V55"
-WG_PACKAGE_URL        = "https://git.zx2c4.com/wireguard-apple"
-WG_PACKAGE_REQUIREMENT = { kind: "branch", branch: "master" }
+# We use our own fork of the WireGuard iOS/macOS Swift package instead
+# of pulling directly from git.zx2c4.com. Reasons:
+#   - Upstream's Package.swift declares swift-tools-version:5.3 but uses
+#     .iOS(.v15), which was introduced in 5.5. Xcode 26 refuses to load
+#     the manifest as a result. Our fork only bumps the header.
+#   - git.zx2c4.com's HTTP-only clone URL is refused by GitHub's SPM
+#     resolver behind proxies.
+# Pinned to a specific commit for reproducibility. Bump when the
+# upstream project itself needs to move.
+WG_PACKAGE_URL         = "https://github.com/Humata-ai/wireguard-apple"
+WG_PACKAGE_REQUIREMENT = { kind: "revision", revision: "f47e603240ed3256456cc91f81c14675e0bc29fd" }
 
 app_target = project.targets.find { |t| t.name == APP_TARGET_NAME } or
   abort "no #{APP_TARGET_NAME} target found"

@@ -590,10 +590,10 @@
 /* Begin XCRemoteSwiftPackageReference section */
 		E78F8EF50CB1F5D3E114A912 /* XCRemoteSwiftPackageReference "wireguard-apple" */ = {
 			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://git.zx2c4.com/wireguard-apple";
+			repositoryURL = "https://github.com/Humata-ai/wireguard-apple";
 			requirement = {
-				branch = master;
-				kind = branch;
+				kind = revision;
+				revision = f47e603240ed3256456cc91f81c14675e0bc29fd;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
