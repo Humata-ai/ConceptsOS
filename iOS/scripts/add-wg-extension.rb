@@ -201,6 +201,12 @@ ext_target.build_configurations.each do |cfg|
   s["CURRENT_PROJECT_VERSION"]   = "2"
   s["SKIP_INSTALL"]              = "YES"
   s["MACH_O_TYPE"]               = "mh_execute"
+  # Xcode 26 emits a separate debug .dylib alongside the extension
+  # that codesign chokes on with errSecInternalComponent when running
+  # under an automatic-signing identity created via the ASC API.
+  # We don't need previews/hot-reload for an app extension anyway.
+  s["ENABLE_DEBUG_DYLIB"]        = "NO"
+  s["ENABLE_PREVIEWS"]           = "NO"
   existing_search = Array(s["LIBRARY_SEARCH_PATHS"])
   s["LIBRARY_SEARCH_PATHS"]      = (["$(inherited)", libwg_search] + existing_search).uniq
   s["OTHER_LDFLAGS"]             = Array(s["OTHER_LDFLAGS"]).empty? ? ["$(inherited)"] : Array(s["OTHER_LDFLAGS"])
