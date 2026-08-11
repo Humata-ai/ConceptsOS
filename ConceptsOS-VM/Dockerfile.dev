@@ -1,0 +1,73 @@
+# syntax=docker/dockerfile:1.7
+#
+# ConceptsOS-VM (dev): interactive dev image.
+#
+# Unlike ./Dockerfile (which bakes a Next standalone build for prod pods),
+# this image ships the *full ConceptsOS git repo* at /workspace/ConceptsOS,
+# with .git intact and node_modules pre-installed. You edit files in place,
+# Next.js HMR picks them up, and `git push` works from inside the container
+# (assuming you mount your SSH key — see BUILD/RUN below).
+#
+# BUILD (from repo root, NOT from ConceptsOS-VM/):
+#
+#   cd ~/github/Humata-ai/ConceptsOS
+#   docker build -f ConceptsOS-VM/Dockerfile.dev -t conceptsos-vm:dev .
+#
+# RUN (mount SSH so `git push` uses your key; expose AgentChat dev port):
+#
+#   docker run --rm -it \
+#     -p 3050:3050 \
+#     -v "$HOME/.ssh:/root/.ssh:ro" \
+#     -v "$HOME/.gitconfig:/root/.gitconfig:ro" \
+#     conceptsos-vm:dev
+#
+# Default CMD runs AgentChat's `npm run dev` (HMR on :3050). To hack on
+# DesktopUI too, open another shell in the container:
+#
+#   docker exec -it <container> bash
+#   cd /workspace/ConceptsOS/DesktopUI && npm start   # CRA dev on :3000
+#
+# Secrets: .env / .env.local files are excluded via .dockerignore. Populate
+# them at runtime (bind-mount or `docker run --env-file`).
+
+FROM node:22-bookworm-slim
+
+# git + build essentials + a couple of QoL tools for interactive use.
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        git openssh-client ca-certificates curl \
+        build-essential python3 \
+        tini procps less vim; \
+    rm -rf /var/lib/apt/lists/*
+
+# Trust github.com host key so `git push` over SSH doesn't prompt.
+RUN mkdir -p /root/.ssh && \
+    ssh-keyscan -t rsa,ed25519 github.com >> /root/.ssh/known_hosts && \
+    chmod 700 /root/.ssh
+
+WORKDIR /workspace/ConceptsOS
+
+# Copy the whole repo (subject to .dockerignore, which strips node_modules,
+# .env files, build artifacts, .wg-state, etc.). .git is preserved so
+# `git status` / `git push` work inside the container.
+COPY . .
+
+# Pre-install deps for the two Node subprojects so first-boot is fast.
+# Keep them as real node_modules (not omit=dev) so `next dev` / CRA work.
+RUN cd AgentChat && npm install --no-audit --no-fund
+RUN cd DesktopUI && npm install --no-audit --no-fund
+
+# Optional: pi CLI, same as prod image, so `pi` is on PATH inside the VM.
+RUN npm install -g --no-audit --no-fund @earendil-works/pi-coding-agent@0.84.1
+COPY docker/pi-extensions/conceptsos-provider.ts /root/.pi/agent/extensions/conceptsos-provider.ts
+
+ENV NODE_ENV=development \
+    NEXT_TELEMETRY_DISABLED=1
+
+EXPOSE 3050/tcp
+EXPOSE 3000/tcp
+
+WORKDIR /workspace/ConceptsOS/AgentChat
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["npm", "run", "dev"]

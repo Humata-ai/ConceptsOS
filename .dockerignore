@@ -1,0 +1,43 @@
+# Keep secrets and local state out of any image built from this repo.
+# Applies to both ConceptsOS-VM/Dockerfile (prod) and Dockerfile.dev.
+
+# --- secrets -----------------------------------------------------------
+**/.env
+**/.env.local
+**/.env.*.local
+# Keep .env.example (checked-in templates) — they're harmless.
+!**/.env.example
+# DesktopUI/.env is checked in (just BROWSER=none for CRA); keep it.
+!DesktopUI/.env
+
+# --- WireGuard peer table / server key (treat as vault) ----------------
+.wg-state/
+
+# --- node ---------------------------------------------------------------
+**/node_modules/
+**/.next/
+**/build/
+**/dist/
+**/*.tsbuildinfo
+
+# --- terraform local state ---------------------------------------------
+terraform/.terraform/
+terraform/*.tfstate*
+terraform/*.tfplan
+terraform/crash.log
+
+# --- test / tooling artifacts ------------------------------------------
+**/test-results/
+**/playwright-report/
+**/coverage/
+**/.turbo/
+**/.cache/
+
+# --- editor / OS junk --------------------------------------------------
+.DS_Store
+**/.DS_Store
+.idea/
+.vscode/
+
+# --- git hygiene: keep .git (we want it inside dev image) --------------
+# NOTE: do NOT ignore .git — Dockerfile.dev relies on it for `git push`.
