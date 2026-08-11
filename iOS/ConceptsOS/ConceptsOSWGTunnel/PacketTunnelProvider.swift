@@ -38,8 +38,9 @@ final class PacketTunnelProvider: NEPacketTunnelProvider {
 
         let tunnelConfiguration: TunnelConfiguration
         do {
-            tunnelConfiguration = try TunnelConfiguration(fromWgQuickConfig: wgQuickConfig, called: "ConceptsOS")
+            tunnelConfiguration = try WGQuickParser.parse(wgQuickConfig, name: "ConceptsOS")
         } catch {
+            os_log("wg: parse failed: %{public}s", log: OSLog(subsystem: "ai.humata.ConceptsOS.WGTunnel", category: "wireguard"), type: .error, error.localizedDescription)
             completionHandler(PacketTunnelProviderError.savedProtocolConfigurationIsInvalid)
             return
         }

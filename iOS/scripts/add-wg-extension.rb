@@ -240,11 +240,28 @@ if app_views_group && !app_views_group.files.any? { |f| f.path == "InstallTunnel
 end
 
 app_wg_group = project.main_group.recursive_children.find { |g| g.is_a?(Xcodeproj::Project::Object::PBXGroup) && g.path == "WireGuard" }
-if app_wg_group && !app_wg_group.files.any? { |f| f.path == "TunnelManager.swift" }
-  ref = app_wg_group.new_reference("TunnelManager.swift")
-  ref.last_known_file_type = "sourcecode.swift"
-  app_target.source_build_phase.add_file_reference(ref)
-  puts "+ added TunnelManager.swift to app target"
+if app_wg_group
+  {
+    "TunnelManager.swift"  => [app_target],
+    # WGQuickParser is compiled into BOTH the app and the extension.
+    # We keep the source of truth in the app's WireGuard/ folder and
+    # reference it from the extension target too, rather than
+    # duplicating the file.
+    "WGQuickParser.swift"  => [app_target, ext_target],
+  }.each do |fname, targets|
+    ref = app_wg_group.files.find { |f| f.path == fname }
+    if ref.nil?
+      ref = app_wg_group.new_reference(fname)
+      ref.last_known_file_type = "sourcecode.swift"
+      puts "+ added #{fname} file reference"
+    end
+    targets.each do |t|
+      unless t.source_build_phase.files_references.include?(ref)
+        t.source_build_phase.add_file_reference(ref)
+        puts "+ compiled #{fname} into #{t.name}"
+      end
+    end
+  end
 end
 
 project.save
