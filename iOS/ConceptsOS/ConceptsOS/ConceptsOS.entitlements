@@ -8,5 +8,26 @@
     <array>
         <string>Default</string>
     </array>
+
+    <!-- Required so we can install and control our own bundled
+         WireGuard tunnel via NETunnelProviderManager. The matching
+         extension bundle (ai.humata.ConceptsOS.WGTunnel) also carries
+         this entitlement. Must be enabled on the App ID in the Apple
+         Developer portal (Capabilities → Network Extensions →
+         Packet Tunnel). -->
+    <key>com.apple.developer.networking.networkextension</key>
+    <array>
+        <string>packet-tunnel-provider</string>
+    </array>
+
+    <!-- App Group is shared between the main app and the packet-tunnel
+         extension. We don't actually use it for shared storage today
+         (the wg config travels inside the VPN profile itself), but iOS
+         requires the extension to belong to the same App Group as its
+         host app when using NETunnelProviderManager. -->
+    <key>com.apple.security.application-groups</key>
+    <array>
+        <string>group.ai.humata.ConceptsOS</string>
+    </array>
 </dict>
 </plist>

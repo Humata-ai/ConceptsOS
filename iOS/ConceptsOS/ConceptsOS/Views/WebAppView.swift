@@ -9,5 +9,6 @@ struct WebAppView: View {
     var body: some View {
         WebView(url: url)
             .ignoresSafeArea()
+            .accessibilityIdentifier("webAppView")
     }
 }

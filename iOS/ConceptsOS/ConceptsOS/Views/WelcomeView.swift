@@ -40,6 +40,7 @@ struct WelcomeView: View {
                 .signInWithAppleButtonStyle(.black)
                 .frame(height: 50)
                 .disabled(auth.isAuthenticating)
+                .accessibilityIdentifier("signInWithAppleButton")
 
                 if let msg = auth.errorMessage {
                     Text(msg)
@@ -57,6 +58,7 @@ struct WelcomeView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
+        .accessibilityIdentifier("welcomeView")
     }
 }
 

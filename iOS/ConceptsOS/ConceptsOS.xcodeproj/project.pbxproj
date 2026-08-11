@@ -7,6 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0585150837E83BBEFF66C6D8 /* TunnelManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B40AB00431F1FB388150E9D /* TunnelManager.swift */; };
+		5720763A6CD298B8DE379E20 /* WireGuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = EEEC78E0FAFF0B201A578372 /* WireGuardKit */; };
+		66717A4D10A895A12DF40975 /* PacketTunnelProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4989A0E27DF870FF283F3606 /* PacketTunnelProvider.swift */; };
+		7B1E1F8C487F60C0DFA390DB /* ConceptsOSWGTunnel.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = 76AB08872FC7A9B36F7FCD7A /* ConceptsOSWGTunnel.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A100000000000000000000A1 /* ConceptsOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000A1 /* ConceptsOSApp.swift */; };
 		A100000000000000000000A2 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000A2 /* ContentView.swift */; };
 		A100000000000000000000A3 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000A3 /* WebView.swift */; };
@@ -21,11 +25,41 @@
 		A100000000000000000000B7 /* WireGuardKeys.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B7 /* WireGuardKeys.swift */; };
 		A100000000000000000000B8 /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B8 /* WelcomeView.swift */; };
 		A100000000000000000000B9 /* ProvisioningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000B9 /* ProvisioningView.swift */; };
-		A100000000000000000000BA /* SetupTunnelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000BA /* SetupTunnelView.swift */; };
 		A100000000000000000000BB /* WebAppView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B100000000000000000000BB /* WebAppView.swift */; };
+		DCA2740DE186A1021288FD4A /* WireGuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = 631DA886C8AAAF34B6195A8F /* WireGuardKit */; };
+		F0078C6789CAB9F7DAB81A7F /* InstallTunnelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C130EE2B5650CBCE289745D2 /* InstallTunnelView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		5C85A366446FC6F77C84EA11 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E100000000000000000000A0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 09FBA522F8C0E52C629E947A;
+			remoteInfo = ConceptsOSWGTunnel;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A63390702CA3D90B8212B762 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				7B1E1F8C487F60C0DFA390DB /* ConceptsOSWGTunnel.appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		34FFEA5C267E844DF7675150 /* ConceptsOSWGTunnel.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = ConceptsOSWGTunnel.entitlements; sourceTree = "<group>"; };
+		3B40AB00431F1FB388150E9D /* TunnelManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = TunnelManager.swift; sourceTree = "<group>"; };
+		4989A0E27DF870FF283F3606 /* PacketTunnelProvider.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PacketTunnelProvider.swift; sourceTree = "<group>"; };
+		6E60F6C6B72B7ADE0CE05F61 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		76AB08872FC7A9B36F7FCD7A /* ConceptsOSWGTunnel.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ConceptsOSWGTunnel.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		B000000000000000000000A0 /* ConceptsOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ConceptsOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		B100000000000000000000A1 /* ConceptsOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConceptsOSApp.swift; sourceTree = "<group>"; };
 		B100000000000000000000A2 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -43,26 +77,56 @@
 		B100000000000000000000B7 /* WireGuardKeys.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WireGuardKeys.swift; sourceTree = "<group>"; };
 		B100000000000000000000B8 /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		B100000000000000000000B9 /* ProvisioningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProvisioningView.swift; sourceTree = "<group>"; };
-		B100000000000000000000BA /* SetupTunnelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SetupTunnelView.swift; sourceTree = "<group>"; };
 		B100000000000000000000BB /* WebAppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppView.swift; sourceTree = "<group>"; };
+		C130EE2B5650CBCE289745D2 /* InstallTunnelView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InstallTunnelView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		02272EBA268D3ECA70F87FAD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5720763A6CD298B8DE379E20 /* WireGuardKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		C000000000000000000000A0 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DCA2740DE186A1021288FD4A /* WireGuardKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		D000000000000000000000A0 /* ConceptsOS */ = {
+		3CD648920CB244267BE65A28 /* ConceptsOSWGTunnel */ = {
+			isa = PBXGroup;
+			children = (
+				4989A0E27DF870FF283F3606 /* PacketTunnelProvider.swift */,
+				6E60F6C6B72B7ADE0CE05F61 /* Info.plist */,
+				34FFEA5C267E844DF7675150 /* ConceptsOSWGTunnel.entitlements */,
+			);
+			name = ConceptsOSWGTunnel;
+			path = ConceptsOSWGTunnel;
+			sourceTree = "<group>";
+		};
+		6977E51691380FA9129BCF6A /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				DF13A61F380AE24A4871BD64 /* iOS */,
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		D000000000000000000000A0 = {
 			isa = PBXGroup;
 			children = (
 				D000000000000000000000A1 /* ConceptsOS */,
 				D000000000000000000000A2 /* Products */,
+				6977E51691380FA9129BCF6A /* Frameworks */,
+				3CD648920CB244267BE65A28 /* ConceptsOSWGTunnel */,
 			);
 			sourceTree = "<group>";
 		};
@@ -90,6 +154,7 @@
 			isa = PBXGroup;
 			children = (
 				B000000000000000000000A0 /* ConceptsOS.app */,
+				76AB08872FC7A9B36F7FCD7A /* ConceptsOSWGTunnel.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -124,6 +189,7 @@
 			isa = PBXGroup;
 			children = (
 				B100000000000000000000B7 /* WireGuardKeys.swift */,
+				3B40AB00431F1FB388150E9D /* TunnelManager.swift */,
 			);
 			path = WireGuard;
 			sourceTree = "<group>";
@@ -133,15 +199,43 @@
 			children = (
 				B100000000000000000000B8 /* WelcomeView.swift */,
 				B100000000000000000000B9 /* ProvisioningView.swift */,
-				B100000000000000000000BA /* SetupTunnelView.swift */,
 				B100000000000000000000BB /* WebAppView.swift */,
+				C130EE2B5650CBCE289745D2 /* InstallTunnelView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		DF13A61F380AE24A4871BD64 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = iOS;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		09FBA522F8C0E52C629E947A /* ConceptsOSWGTunnel */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = CA678BBBC9EB15211693B54A /* Build configuration list for PBXNativeTarget "ConceptsOSWGTunnel" */;
+			buildPhases = (
+				1044549BD4B89CFFB763E6FC /* Build wireguard-go-bridge */,
+				8F8075FB896D4DBA27849A4A /* Sources */,
+				02272EBA268D3ECA70F87FAD /* Frameworks */,
+				91629C063612AEA4D17143EF /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ConceptsOSWGTunnel;
+			packageProductDependencies = (
+				EEEC78E0FAFF0B201A578372 /* WireGuardKit */,
+			);
+			productName = ConceptsOSWGTunnel;
+			productReference = 76AB08872FC7A9B36F7FCD7A /* ConceptsOSWGTunnel.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		E000000000000000000000A0 /* ConceptsOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = F000000000000000000000A2 /* Build configuration list for PBXNativeTarget "ConceptsOS" */;
@@ -149,12 +243,17 @@
 				F000000000000000000000A5 /* Sources */,
 				C000000000000000000000A0 /* Frameworks */,
 				F000000000000000000000A6 /* Resources */,
+				A63390702CA3D90B8212B762 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				525ADDF5DDC4B93FD6F4A2B0 /* PBXTargetDependency */,
 			);
 			name = ConceptsOS;
+			packageProductDependencies = (
+				631DA886C8AAAF34B6195A8F /* WireGuardKit */,
+			);
 			productName = ConceptsOS;
 			productReference = B000000000000000000000A0 /* ConceptsOS.app */;
 			productType = "com.apple.product-type.application";
@@ -183,16 +282,27 @@
 				Base,
 			);
 			mainGroup = D000000000000000000000A0;
+			packageReferences = (
+				E78F8EF50CB1F5D3E114A912 /* XCRemoteSwiftPackageReference "wireguard-apple" */,
+			);
 			productRefGroup = D000000000000000000000A2 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
 				E000000000000000000000A0 /* ConceptsOS */,
+				09FBA522F8C0E52C629E947A /* ConceptsOSWGTunnel */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		91629C063612AEA4D17143EF /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F000000000000000000000A6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -204,7 +314,36 @@
 		};
 /* End PBXResourcesBuildPhase section */
 
+/* Begin PBXShellScriptBuildPhase section */
+		1044549BD4B89CFFB763E6FC /* Build wireguard-go-bridge */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build wireguard-go-bridge";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n# WireGuardKit itself is a pure Swift wrapper; the actual crypto/data\n# plane is a Go binary shipped as a static lib (libwg-go.a). SwiftPM\n# can't run `go build` for us, so we do it here.\n#\n# Requires `go` on PATH.\nexport PATH=\"/opt/homebrew/bin:/usr/local/bin:/usr/local/go/bin:$PATH\"\nWGGO_DIR=\"${BUILD_DIR%Build/*}SourcePackages/checkouts/wireguard-apple/Sources/WireGuardKitGo\"\nif [ ! -d \"$WGGO_DIR\" ]; then\n  echo \"warning: WireGuardKitGo checkout not found at $WGGO_DIR; skipping\" >&2\n  exit 0\nfi\ncd \"$WGGO_DIR\"\nmake\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
 /* Begin PBXSourcesBuildPhase section */
+		8F8075FB896D4DBA27849A4A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				66717A4D10A895A12DF40975 /* PacketTunnelProvider.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F000000000000000000000A5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -221,14 +360,52 @@
 				A100000000000000000000B7 /* WireGuardKeys.swift in Sources */,
 				A100000000000000000000B8 /* WelcomeView.swift in Sources */,
 				A100000000000000000000B9 /* ProvisioningView.swift in Sources */,
-				A100000000000000000000BA /* SetupTunnelView.swift in Sources */,
 				A100000000000000000000BB /* WebAppView.swift in Sources */,
+				F0078C6789CAB9F7DAB81A7F /* InstallTunnelView.swift in Sources */,
+				0585150837E83BBEFF66C6D8 /* TunnelManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		525ADDF5DDC4B93FD6F4A2B0 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = ConceptsOSWGTunnel;
+			target = 09FBA522F8C0E52C629E947A /* ConceptsOSWGTunnel */;
+			targetProxy = 5C85A366446FC6F77C84EA11 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		EDF45338CAF4F1ED01DAC68D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ConceptsOSWGTunnel/ConceptsOSWGTunnel.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 2U53525V55;
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ConceptsOSWGTunnel/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
+				);
+				MACH_O_TYPE = mh_execute;
+				MARKETING_VERSION = 1.1;
+				OTHER_LDFLAGS = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = ai.humata.ConceptsOS.WGTunnel;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
 		F000000000000000000000B1 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -304,6 +481,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
+				);
 				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.humata.ConceptsOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -332,6 +513,10 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
+				);
 				MARKETING_VERSION = 1.1;
 				PRODUCT_BUNDLE_IDENTIFIER = ai.humata.ConceptsOS;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -341,9 +526,47 @@
 			};
 			name = Release;
 		};
+		FCBB626F3EE1EAFC5440A18A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_ENABLE_OBJC_WEAK = NO;
+				CODE_SIGN_ENTITLEMENTS = ConceptsOSWGTunnel/ConceptsOSWGTunnel.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 2U53525V55;
+				ENABLE_BITCODE = NO;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ConceptsOSWGTunnel/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)",
+				);
+				MACH_O_TYPE = mh_execute;
+				MARKETING_VERSION = 1.1;
+				OTHER_LDFLAGS = "$(inherited)";
+				PRODUCT_BUNDLE_IDENTIFIER = ai.humata.ConceptsOS.WGTunnel;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		CA678BBBC9EB15211693B54A /* Build configuration list for PBXNativeTarget "ConceptsOSWGTunnel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				FCBB626F3EE1EAFC5440A18A /* Release */,
+				EDF45338CAF4F1ED01DAC68D /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		F000000000000000000000A1 /* Build configuration list for PBXProject "ConceptsOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -363,6 +586,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		E78F8EF50CB1F5D3E114A912 /* XCRemoteSwiftPackageReference "wireguard-apple" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://git.zx2c4.com/wireguard-apple";
+			requirement = {
+				branch = master;
+				kind = branch;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		631DA886C8AAAF34B6195A8F /* WireGuardKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E78F8EF50CB1F5D3E114A912 /* XCRemoteSwiftPackageReference "wireguard-apple" */;
+			productName = WireGuardKit;
+		};
+		EEEC78E0FAFF0B201A578372 /* WireGuardKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = E78F8EF50CB1F5D3E114A912 /* XCRemoteSwiftPackageReference "wireguard-apple" */;
+			productName = WireGuardKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = E100000000000000000000A0 /* Project object */;
 }

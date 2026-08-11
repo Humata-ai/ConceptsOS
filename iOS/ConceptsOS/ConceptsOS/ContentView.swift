@@ -1,9 +1,13 @@
 // Top-level state machine for the app.
 //
-//   signed out                   → WelcomeView
-//   signed in, no VM ready       → ProvisioningView (polls /api/vm)
-//   VM ready, no tunnel installed → SetupTunnelView
-//   fully set up                  → WebAppView (WKWebView on 10.10.0.1:3000)
+//   signed out                    → WelcomeView
+//   signed in, no VM ready        → ProvisioningView  (polls /api/vm)
+//   VM ready, tunnel not connected → InstallTunnelView (auto-installs +
+//                                                       connects the
+//                                                       bundled WG
+//                                                       extension)
+//   fully set up                   → WebAppView        (WKWebView on
+//                                                       10.10.0.1:3000)
 
 import SwiftUI
 
@@ -18,7 +22,7 @@ struct ContentView: View {
             } else if !isVMReady {
                 ProvisioningView()
             } else if !vmState.tunnelInstalled {
-                SetupTunnelView()
+                InstallTunnelView()
             } else {
                 WebAppView(url: URL(string: vmState.appURL ?? AppConfig.podURL)!)
             }
