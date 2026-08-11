@@ -20,13 +20,11 @@ struct VPNExplainerView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer(minLength: 8)
+            Spacer(minLength: 24)
 
             TunnelGraphic()
-                .frame(height: 180)
-                .padding(.horizontal, 24)
-
-            Spacer(minLength: 24)
+                .frame(height: 200)
+                .padding(.horizontal, 20)
 
             VStack(spacing: 12) {
                 Text("Your private tunnel")
@@ -39,8 +37,9 @@ struct VPNExplainerView: View {
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 24)
             }
+            .padding(.top, 8)
 
-            Spacer(minLength: 24)
+            Spacer(minLength: 20)
 
             VStack(alignment: .leading, spacing: 14) {
                 BulletRow(
