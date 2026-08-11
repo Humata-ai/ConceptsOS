@@ -29,6 +29,11 @@ type Store = {
   live: Map<string, ServerSession>;
   sdk?: PiSdk;
   sdkInit?: Promise<PiSdk>;
+  // Shared, provider-configured ModelRuntime. See getModelRuntime().
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  modelRuntime?: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  modelRuntimeInit?: Promise<any>;
 };
 
 // Survive Next.js dev HMR by pinning to globalThis.
@@ -49,12 +54,67 @@ async function loadSdk(): Promise<PiSdk> {
   return store.sdkInit;
 }
 
+/**
+ * Build (once) a ModelRuntime that has the ConceptsOS anthropic proxy
+ * pre-registered.
+ *
+ * Why not just the extension? `createAgentSession()` (the SDK API we use)
+ * loads extensions but does NOT apply their pendingProviderRegistrations to
+ * the ModelRuntime — that step only exists in pi's own CLI init flow
+ * (core/agent-session-services.ts). So the baked-in
+ * ~/.pi/agent/extensions/conceptsos-provider.ts is inert here, and we have
+ * to register the provider in-process ourselves.
+ *
+ * Env is populated by k8s (api/src/lib/k8s.ts):
+ *   CONCEPTSOS_BASE_URL = http://conceptsos-api.…/api/llm
+ *   CONCEPTSOS_API_KEY  = <per-user cos_… key>
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function getModelRuntime(): Promise<any> {
+  if (store.modelRuntime) return store.modelRuntime;
+  if (!store.modelRuntimeInit) {
+    store.modelRuntimeInit = (async () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sdkAny = (await loadSdk()) as any;
+      const ModelRuntime = sdkAny.ModelRuntime;
+      if (!ModelRuntime?.create) {
+        throw new Error(
+          "pi-coding-agent does not export ModelRuntime.create — SDK version mismatch",
+        );
+      }
+      const rt = await ModelRuntime.create({});
+      const baseUrl = process.env.CONCEPTSOS_BASE_URL;
+      const apiKey = process.env.CONCEPTSOS_API_KEY;
+      if (baseUrl && apiKey) {
+        rt.registerProvider("anthropic", {
+          baseUrl,
+          // Placeholder — real auth is the Authorization header below. The
+          // proxy strips x-api-key before forwarding to Anthropic.
+          apiKey: "unused",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+          },
+        });
+      } else {
+        console.warn(
+          "[pi-server] CONCEPTSOS_BASE_URL / CONCEPTSOS_API_KEY not set; anthropic provider will fall back to pi defaults and likely fail auth.",
+        );
+      }
+      store.modelRuntime = rt;
+      return rt;
+    })();
+  }
+  return store.modelRuntimeInit;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function hydrateSession(sm: any): Promise<ServerSession> {
   const { createAgentSession } = await loadSdk();
+  const modelRuntime = await getModelRuntime();
   const { session } = await createAgentSession({
     cwd: AGENT_CWD,
     sessionManager: sm,
+    modelRuntime,
   });
   const id: string = sm.getSessionId();
   const path: string = sm.getSessionFile() ?? "";

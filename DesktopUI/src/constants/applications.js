@@ -16,7 +16,6 @@ export const APP_NAMES = {
 	AI_AGENT: "AI Agent"
 };
 
-// URL of the embedded AI Agent (AgentChat) webview. Same-origin: the
-// container's reverse proxy serves DesktopUI at / and proxies /agent/*
-// to the AgentChat Next.js server on localhost:3050.
-export const AI_AGENT_URL = "/agent/";
+// URL of the embedded AI Agent (AgentChat) webview. Same-origin: a
+// single Next.js server serves DesktopUI at / and AgentChat at /chat.
+export const AI_AGENT_URL = "/chat";

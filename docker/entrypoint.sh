@@ -1,23 +1,12 @@
 #!/usr/bin/env bash
 #
-# ConceptsOS-VM entrypoint.
+# ConceptsOS-VM entrypoint. Single Next.js process serves DesktopUI + AgentChat.
+# CONCEPTSOS_WG picks the bind address:
 #
-# The pod runs two processes:
-#
-#   1. AgentChat (Next.js standalone)  →  127.0.0.1:$AGENTCHAT_PORT (3050)
-#   2. Caddy                           →  $CADDY_BIND (:3000 or wg0-ip:3000)
-#
-# Caddy serves DesktopUI static at /, and reverse-proxies /agent/* to
-# AgentChat. iOS opens http://<pod>:3000/ → the desktop shell, whose
-# "AI Agent" app iframes /agent/ into a WKWebView-friendly single origin.
-#
-# CONCEPTSOS_WG branches only on caddy's bind address:
-#
-#   external — default in hosted deployment. Caddy binds :3000 on all
-#              interfaces. wg-gateway pod terminates VPN outside.
-#   embedded — self-hosters. wg-quick brings up wg0 from the mounted
-#              config, caddy binds the wg0 IP so only VPN peers can
-#              reach the pod.
+#   external — hosted deployment. Bind 0.0.0.0:$PORT. wg-gateway pod
+#              handles VPN termination outside this container.
+#   embedded — self-hosters. Bring up wg0 from a mounted config, bind
+#              the wg0 tunnel IP so only VPN peers can reach the app.
 
 set -euo pipefail
 
@@ -25,13 +14,14 @@ log() { echo "[entrypoint $(date -u +%H:%M:%S)] $*" >&2; }
 
 MODE="${CONCEPTSOS_WG:-external}"
 PORT="${PORT:-3000}"
-AGENTCHAT_PORT="${AGENTCHAT_PORT:-3050}"
 
-# Resolve caddy bind address per mode.
 case "$MODE" in
   external)
     log "wg mode: external (no in-container VPN)"
-    CADDY_BIND=":${PORT}"
+    export HOSTNAME="0.0.0.0"
+    export PORT
+    log "starting Next.js on ${HOSTNAME}:${PORT}"
+    exec node /app/server.js
     ;;
 
   embedded)
@@ -57,8 +47,12 @@ case "$MODE" in
     fi
     log "wg0 = $WG_IP"
 
-    CADDY_BIND="${WG_IP}:${PORT}"
+    export HOSTNAME="$WG_IP"
+    export PORT
+    log "starting Next.js on ${HOSTNAME}:${PORT}"
+
     trap 'log "shutting down"; wg-quick down wg0 2>/dev/null || true' EXIT
+    exec node /app/server.js
     ;;
 
   *)
@@ -66,26 +60,3 @@ case "$MODE" in
     exit 1
     ;;
 esac
-
-# 1. Start AgentChat on loopback in the background.
-export HOSTNAME="127.0.0.1"
-export PORT="$AGENTCHAT_PORT"
-log "starting AgentChat (Next.js) on 127.0.0.1:${AGENTCHAT_PORT}"
-node /app/server.js &
-AGENTCHAT_PID=$!
-
-# 2. Start caddy in the foreground (main process — tini reaps it).
-export CADDY_BIND
-export AGENTCHAT_UPSTREAM="127.0.0.1:${AGENTCHAT_PORT}"
-log "starting caddy on ${CADDY_BIND} (proxying /agent/* → ${AGENTCHAT_UPSTREAM})"
-
-# If AgentChat crashes we want the whole pod to restart, not silently
-# serve DesktopUI with a broken /agent/. Kill caddy if the node child dies.
-(
-  wait "$AGENTCHAT_PID"
-  rc=$?
-  log "AgentChat exited (rc=$rc); shutting down caddy"
-  pkill -TERM caddy 2>/dev/null || true
-) &
-
-exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
