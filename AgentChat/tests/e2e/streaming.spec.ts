@@ -73,19 +73,43 @@ async function queueMock(page: Page, events: MockEvent[]) {
 /**
  * Load the app in a clean state and wait for it to be ready to send.
  * Must be called BEFORE queueMock — queueMock persists on the current page.
+ *
+ * We deliberately create a *fresh* session via POST /api/sessions and pin it
+ * via localStorage before the app loads. Without this, the app boots into
+ * whatever session happens to be first in the dev server's DB, and the
+ * message list is polluted with real prior chats — which then blows up every
+ * strict-mode locator like getByTestId("assistant-message").
  */
 async function bootChatUI(page: Page) {
-  // First visit: clear any persisted activeId from prior tests.
+  // Land on the origin so we can talk to same-origin localStorage/APIs.
   await page.goto("/");
-  await page.evaluate(() => localStorage.clear());
+  // Mint a brand-new session server-side and pin it as the active one.
+  const freshId = await page.evaluate(async () => {
+    window.localStorage.clear();
+    const res = await fetch("/api/sessions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
+    const data = (await res.json()) as { session: { id: string } };
+    window.localStorage.setItem("chatui-active", data.session.id);
+    return data.session.id;
+  });
+  // Reload so the app picks up chatui-active on mount and hydrates the
+  // (empty) fresh session instead of falling back to sessions[0].
   await page.goto("/");
   const input = page.getByPlaceholder("Send a message…");
   await expect(input).toBeVisible();
   // Wait until the send button becomes enabled after typing — this proves
-  // bootstrap POST /api/sessions has completed and activeId is set.
+  // the sessions bootstrap has completed and activeId is set.
   await input.fill("warmup");
   await expect(page.getByRole("button", { name: "send" })).toBeEnabled();
   await input.fill("");
+  // Belt-and-braces: assert we really are on the fresh empty session, not
+  // a polluted one, so failures later in the test are actionable.
+  await expect(page.getByTestId("assistant-message")).toHaveCount(0);
+  await expect(page.getByTestId("user-message")).toHaveCount(0);
+  return freshId;
 }
 
 async function sendPrompt(page: Page, text: string) {
