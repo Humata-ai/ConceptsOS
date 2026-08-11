@@ -35,7 +35,11 @@ spec:
             - name: K8S_USERS_NAMESPACE
               value: "users"
             - name: USER_POD_IMAGE
-              value: "us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/vm:latest"
+              # Dev-flavor VM: full ConceptsOS git repo at
+              # /workspace/ConceptsOS inside the pod, .git intact,
+              # node_modules preinstalled, `next dev` (HMR) as the entry.
+              # Rollback: point back at conceptsos/vm:latest.
+              value: "us-central1-docker.pkg.dev/conceptsos-prd/conceptsos/vm-dev:latest"
             - name: USER_POD_STORAGE_GB
               value: "10"
             - name: WG_CLIENT_SUBNET

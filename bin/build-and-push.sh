@@ -4,11 +4,17 @@
 #
 #   api          — provisioning API + reconcile loop (api.conceptsos.com)
 #   wg-gateway   — shared WireGuard endpoint
-#   vm           — per-user pod image (ConceptsOS-VM)
+#   vm           — per-user pod image (ConceptsOS-VM, prod: Next standalone)
+#   vm-dev       — per-user pod image, dev flavor: full repo + .git + HMR
+#                  (built from ConceptsOS-VM/Dockerfile.dev). Push this and
+#                  flip USER_POD_IMAGE in k8s/api/deployment.yaml to hand
+#                  users an editable in-container repo instead of a
+#                  read-only standalone build.
 #
 # Usage:
-#   bin/build-and-push.sh              # all three
+#   bin/build-and-push.sh              # api + wg-gateway + vm (prod set)
 #   bin/build-and-push.sh api          # just one
+#   bin/build-and-push.sh vm-dev       # dev vm image
 #
 # Requires: docker (or `gcloud builds submit`), auth against GAR.
 
@@ -55,6 +61,7 @@ for t in "${targets[@]}"; do
     api)         build_image api        api/Dockerfile               api ;;
     wg-gateway)  build_image wg-gateway docker/wg-gateway/Dockerfile docker/wg-gateway ;;
     vm)          build_image vm         ConceptsOS-VM/Dockerfile     . ;;
-    *) echo "unknown target: $t (want: api|wg-gateway|vm)" >&2; exit 1 ;;
+    vm-dev)      build_image vm-dev     ConceptsOS-VM/Dockerfile.dev . ;;
+    *) echo "unknown target: $t (want: api|wg-gateway|vm|vm-dev)" >&2; exit 1 ;;
   esac
 done
