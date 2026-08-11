@@ -21,6 +21,7 @@
 // metering layer before opening real signups.
 
 import { env } from "@/lib/env";
+import { withLogging } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -98,8 +99,9 @@ async function proxy(req: Request, ctx: { params: Promise<{ path: string[] }> })
   });
 }
 
-export const GET = proxy;
-export const POST = proxy;
-export const DELETE = proxy;
-export const PATCH = proxy;
-export const PUT = proxy;
+const wrapped = withLogging<{ params: Promise<{ path: string[] }> }>("llm.proxy", proxy);
+export const GET = wrapped;
+export const POST = wrapped;
+export const DELETE = wrapped;
+export const PATCH = wrapped;
+export const PUT = wrapped;

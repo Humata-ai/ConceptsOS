@@ -20,11 +20,12 @@ import { adminClient, authUserId } from "@/lib/supabase";
 import { revokeUserKey } from "@/lib/anthropic";
 import { deleteUserPod } from "@/lib/k8s";
 import { removePeer } from "@/lib/gateway";
+import { withLogging } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function DELETE(req: Request) {
+export const DELETE = withLogging("account", async (req: Request) => {
   const url = new URL(req.url);
   const overrideUserId = url.searchParams.get("userId");
 
@@ -89,4 +90,4 @@ export async function DELETE(req: Request) {
     had_vm: !!vm,
     ...(Object.keys(errors).length ? { non_fatal_errors: errors } : {}),
   });
-}
+});

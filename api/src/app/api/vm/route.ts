@@ -6,11 +6,12 @@
 import { NextResponse } from "next/server";
 import { authUserId, adminClient } from "@/lib/supabase";
 import { buildClientConfig } from "@/lib/wg";
+import { withLogging } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+export const GET = withLogging("vm", async (req: Request) => {
   const uid = await authUserId(req);
   if (!uid) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
@@ -72,4 +73,4 @@ export async function GET(req: Request) {
         }
       : null,
   });
-}
+});

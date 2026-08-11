@@ -13,6 +13,7 @@ import { z } from "zod";
 import { authUserId, adminClient } from "@/lib/supabase";
 import { allocateClientIp, buildClientConfig, generatePreSharedKey } from "@/lib/wg";
 import { env } from "@/lib/env";
+import { withLogging } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +22,7 @@ const Body = z.object({
   wgPubkey: z.string().min(40).max(50), // wg pubkeys are 44 chars b64
 });
 
-export async function POST(req: Request) {
+export const POST = withLogging("signup", async (req: Request) => {
   const uid = await authUserId(req);
   if (!uid) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
     status: "pending",
     wg: cfg,
   });
-}
+});
 
 function vmResponse(row: any) {
   const cfg = buildClientConfig({

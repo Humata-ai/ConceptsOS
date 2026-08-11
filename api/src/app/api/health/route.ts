@@ -2,10 +2,11 @@
 // the k8s readiness/liveness probes and by uptime monitors.
 
 import { NextResponse } from "next/server";
+import { withLogging } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
+export const GET = withLogging("health", async () => {
   return NextResponse.json({ ok: true, ts: Date.now() });
-}
+});

@@ -18,11 +18,12 @@ import { NextResponse } from "next/server";
 import { adminClient } from "@/lib/supabase";
 import { revokeUserKey } from "@/lib/anthropic";
 import { env } from "@/lib/env";
+import { withLogging } from "@/lib/log";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+export const POST = withLogging("admin.usage-sweep", async (req: Request) => {
   const token = process.env.ADMIN_SWEEP_TOKEN ?? "";
   const provided = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!token || provided !== token) {
@@ -126,7 +127,7 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true, count: results.length, results });
-}
+});
 
 interface Usage {
   inputTokens: number;
