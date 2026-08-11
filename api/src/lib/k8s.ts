@@ -151,12 +151,35 @@ async function ensureStatefulSet(
   };
 
   try {
-    await apps().readNamespacedStatefulSet(name, ns);
-    // Already exists — no-op for V1. Upgrades will use a separate rollout.
+    const existingRes = await apps().readNamespacedStatefulSet(name, ns);
+    const existing = ((existingRes as any).body ?? existingRes) as k8s.V1StatefulSet;
+    // Reconcile: make sure the pod's env vars match what we template. Older
+    // StatefulSets predate CONCEPTSOS_API_KEY and would otherwise 401 at the
+    // LLM proxy forever. We only patch the env list; other fields (image,
+    // resources) are left alone until a proper rollout strategy lands.
+    const desiredEnv = body.spec!.template.spec!.containers[0].env!;
+    const currentEnv = existing.spec?.template?.spec?.containers?.[0]?.env ?? [];
+    if (!envListEqual(currentEnv, desiredEnv)) {
+      await apps().patchNamespacedStatefulSet(
+        name,
+        ns,
+        { spec: { template: { spec: { containers: [{ name: "vm", env: desiredEnv }] } } } },
+        undefined, undefined, undefined, undefined, undefined,
+        { headers: { "content-type": "application/strategic-merge-patch+json" } },
+      );
+    }
   } catch (e) {
     if (!isNotFound(e)) throw e;
     await apps().createNamespacedStatefulSet(ns, body);
   }
+}
+
+function envListEqual(a: k8s.V1EnvVar[], b: k8s.V1EnvVar[]): boolean {
+  if (a.length !== b.length) return false;
+  const key = (e: k8s.V1EnvVar) => `${e.name}=${e.value ?? ""}`;
+  const sa = a.map(key).sort();
+  const sb = b.map(key).sort();
+  return sa.every((v, i) => v === sb[i]);
 }
 
 async function ensureService(
