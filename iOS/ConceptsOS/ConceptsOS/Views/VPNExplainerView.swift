@@ -27,7 +27,7 @@ struct VPNExplainerView: View {
                 .padding(.horizontal, 20)
 
             VStack(spacing: 12) {
-                Text("Your private tunnel")
+                Text("Allow VPN Setup")
                     .font(.system(size: 28, weight: .bold, design: .rounded))
                     .multilineTextAlignment(.center)
 
@@ -135,7 +135,7 @@ private struct TunnelGraphic: View {
                 Endpoint(
                     symbol: "iphone.gen3",
                     label: "This iPhone",
-                    tint: .blue
+                    tint: .primary
                 )
                 .frame(width: endpointSize, height: endpointSize + 24)
                 .position(x: endpointSize / 2 + 4, y: midY)
@@ -144,7 +144,7 @@ private struct TunnelGraphic: View {
                 Endpoint(
                     symbol: "desktopcomputer",
                     label: "Your VM",
-                    tint: .purple
+                    tint: .primary
                 )
                 .frame(width: endpointSize, height: endpointSize + 24)
                 .position(x: w - endpointSize / 2 - 4, y: midY)
@@ -168,9 +168,9 @@ private struct Endpoint: View {
         VStack(spacing: 6) {
             ZStack {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(tint.opacity(0.12))
+                    .fill(Color(.secondarySystemBackground))
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .stroke(tint.opacity(0.35), lineWidth: 1)
+                    .stroke(Color(.separator), lineWidth: 1)
                 Image(systemName: symbol)
                     .font(.system(size: 40, weight: .regular))
                     .foregroundStyle(tint)
@@ -195,23 +195,13 @@ private struct TunnelPipe: View {
         ZStack {
             // Pipe background — subtle rounded rectangle
             Capsule()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.blue.opacity(0.15), Color.purple.opacity(0.15)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
+                .fill(Color(.secondarySystemBackground))
                 .frame(width: to.x - from.x, height: pipeHeight)
                 .position(x: midX, y: from.y)
 
             Capsule()
                 .stroke(
-                    LinearGradient(
-                        colors: [Color.blue.opacity(0.5), Color.purple.opacity(0.5)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    ),
+                    Color(.separator),
                     style: StrokeStyle(lineWidth: 1.5, dash: [4, 4])
                 )
                 .frame(width: to.x - from.x, height: pipeHeight)
@@ -226,21 +216,21 @@ private struct TunnelPipe: View {
                     let span = x1 - x0
                     let period: Double = 2.2
 
-                    // Rightward packets (blue)
+                    // Rightward packets
                     for i in 0..<3 {
                         let phase = (t / period + Double(i) / 3.0).truncatingRemainder(dividingBy: 1.0)
                         let x = x0 + CGFloat(phase) * span
                         let rect = CGRect(x: x - 4, y: from.y - 4, width: 8, height: 8)
                         ctx.opacity = fadeOpacity(phase)
-                        ctx.fill(Path(ellipseIn: rect), with: .color(.blue))
+                        ctx.fill(Path(ellipseIn: rect), with: .color(.primary))
                     }
-                    // Leftward packets (purple)
+                    // Leftward packets
                     for i in 0..<3 {
                         let phase = (t / period + Double(i) / 3.0 + 0.5).truncatingRemainder(dividingBy: 1.0)
                         let x = x1 - CGFloat(phase) * span
                         let rect = CGRect(x: x - 4, y: from.y - 4, width: 8, height: 8)
                         ctx.opacity = fadeOpacity(phase)
-                        ctx.fill(Path(ellipseIn: rect), with: .color(.purple))
+                        ctx.fill(Path(ellipseIn: rect), with: .color(.primary))
                     }
                 }
             }
@@ -250,23 +240,10 @@ private struct TunnelPipe: View {
                 Circle()
                     .fill(Color(.systemBackground))
                 Circle()
-                    .stroke(
-                        LinearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        lineWidth: 2
-                    )
+                    .stroke(Color.primary, lineWidth: 2)
                 Image(systemName: "lock.fill")
                     .font(.system(size: 16, weight: .bold))
-                    .foregroundStyle(
-                        LinearGradient(
-                            colors: [.blue, .purple],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .foregroundStyle(Color.primary)
             }
             .frame(width: 40, height: 40)
             .position(x: midX, y: from.y)
