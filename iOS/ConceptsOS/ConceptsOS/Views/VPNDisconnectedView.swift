@@ -1,29 +1,29 @@
 // Shown when the VPN profile has been installed (so we've already been
 // through the AllowVPN prompt in the past), but the tunnel is not
-// currently `.connected` — e.g. the user toggled VPN off in Settings,
-// iOS tore down the tunnel to save battery, the profile was deleted,
-// or the extension failed to bring it back up on its own.
+// currently `.connected` — e.g. iOS tore the tunnel down, the profile
+// was disabled, or the extension is racing to come back up.
 //
 // The webview can't reach the pod without the tunnel (pod is on
 // 10.10.0.1:3000, only reachable via wg), so instead of a broken
-// WKWebView we render this page. It explains what happened and gives
-// the user the two easiest recovery paths iOS actually allows from an
-// app:
+// WKWebView we render this page.
 //
-//   1. Reconnect in-app  → NETunnelProviderManager.connection.startVPNTunnel()
-//                          Works if the VPN profile is still installed
-//                          and enabled. The system doesn't re-prompt.
-//   2. Open Settings     → UIApplication.openSettingsURLString.
-//                          Sends them to the app's Settings page from
-//                          which the system VPN toggle + "Delete VPN"
-//                          are one tap away. Apple doesn't allow deep-
-//                          linking directly to Settings → VPN from a
-//                          third-party app on iOS 16+.
-//
-// If the profile has been removed entirely (state == .idle) we route
-// the user back through InstallTunnelView via a "Reinstall tunnel"
-// button, which drops `vmState.tunnelInstalled` so ContentView picks
-// up the install flow again.
+// Recovery behavior:
+//   * On appear we `refresh()` state from system prefs, mark our
+//     profile as the *selected* VPN configuration (isEnabled=true),
+//     and fire `startVPNTunnel()`. In practice this is enough — iOS
+//     brings the tunnel back up in a second or two.
+//   * `NEVPNStatusDidChange` is observed by TunnelManager. The moment
+//     the tunnel is `.connected` (whether we reconnected it, or the
+//     user flipped the system VPN toggle from Settings) ContentView
+//     swaps this view out for WebAppView automatically. So there's no
+//     manual "Reconnect" button — it happens live.
+//   * "Open VPN Settings" tries the `App-Prefs:root=General&path=VPN`
+//     deep link (works on most iOS versions) and falls back to the
+//     app's own Settings page (`UIApplication.openSettingsURLString`)
+//     if iOS refuses the private URL.
+//   * If the profile has been removed entirely (state == .idle) we
+//     drop `tunnelInstalled=false` so ContentView routes back to
+//     InstallTunnelView.
 
 import SwiftUI
 import NetworkExtension
@@ -33,7 +33,6 @@ struct VPNDisconnectedView: View {
     @EnvironmentObject var vmState: VMStateStore
     @EnvironmentObject var auth: AuthManager
 
-    @State private var reconnecting = false
     @State private var localError: String?
 
     var body: some View {
@@ -60,6 +59,12 @@ struct VPNDisconnectedView: View {
                 .padding(.top, 12)
                 .accessibilityIdentifier("vpnDisconnectedSubhead")
 
+            if isReconnecting {
+                ProgressView()
+                    .padding(.top, 20)
+                    .accessibilityIdentifier("vpnReconnectingSpinner")
+            }
+
             if let localError {
                 Text(localError)
                     .font(.footnote)
@@ -74,7 +79,8 @@ struct VPNDisconnectedView: View {
 
             VStack(spacing: 12) {
                 if tunnel.state == .idle {
-                    // Profile is gone — re-run install flow.
+                    // Profile was removed — send them back through the
+                    // install flow.
                     Button {
                         vmState.tunnelInstalled = false
                         vmState.persist()
@@ -87,33 +93,15 @@ struct VPNDisconnectedView: View {
                     .accessibilityIdentifier("vpnReinstallButton")
                 } else {
                     Button {
-                        Task { await reconnect() }
+                        openVPNSettings()
                     } label: {
-                        HStack {
-                            if reconnecting {
-                                ProgressView()
-                                    .progressViewStyle(.circular)
-                                    .tint(.white)
-                            }
-                            Text(reconnecting ? "Connecting…" : "Reconnect")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
+                        Text("Open VPN Settings")
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(reconnecting || tunnel.state == .connecting)
-                    .accessibilityIdentifier("vpnReconnectButton")
+                    .accessibilityIdentifier("vpnOpenSettingsButton")
                 }
-
-                Button {
-                    openAppSettings()
-                } label: {
-                    Text("Open Settings")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 6)
-                }
-                .buttonStyle(.bordered)
-                .accessibilityIdentifier("vpnOpenSettingsButton")
             }
             .padding(.horizontal, 32)
 
@@ -132,13 +120,17 @@ struct VPNDisconnectedView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color(.systemBackground))
         .accessibilityIdentifier("vpnDisconnectedView")
-        // Keep our view of the world fresh — if the user flips the
-        // system VPN toggle back on outside the app, ContentView will
-        // observe .connected and swap to WebAppView on its own.
-        .task { await tunnel.refresh() }
+        .task { await autoReconnect() }
     }
 
-    // MARK: - Copy
+    // MARK: - Derived state
+
+    private var isReconnecting: Bool {
+        switch tunnel.state {
+        case .connecting, .disconnecting: return true
+        default: return false
+        }
+    }
 
     private var iconName: String {
         switch tunnel.state {
@@ -168,7 +160,7 @@ struct VPNDisconnectedView: View {
         case .failed:
             return "VPN connection failed"
         default:
-            return "Can’t reach your ConceptsOS computer"
+            return "Reconnecting to your ConceptsOS computer…"
         }
     }
 
@@ -181,41 +173,57 @@ struct VPNDisconnectedView: View {
         case .disconnecting:
             return "One moment…"
         case .failed(let msg):
-            return "iOS reported: \(msg)\n\nTry Reconnect, or open Settings to check whether VPN is enabled."
+            return "iOS reported: \(msg)\n\nTap Open VPN Settings and make sure the ConceptsOS VPN is selected and switched on."
         default:
-            return "Your ConceptsOS-VM lives behind a private WireGuard VPN, and iOS reports that VPN isn’t currently connected. Tap Reconnect to bring it back up."
+            return "Your ConceptsOS-VM lives behind a private WireGuard VPN. We’re trying to bring it back up automatically — if this takes more than a few seconds, open VPN Settings and flip ConceptsOS back on."
         }
     }
 
     // MARK: - Actions
 
-    private func reconnect() async {
+    /// Called on appear. Refreshes tunnel state, makes our profile the
+    /// selected VPN configuration in system prefs, and asks iOS to
+    /// bring the tunnel up. The NEVPNStatusDidChange observer inside
+    /// TunnelManager will flip `state` to `.connected` the instant it
+    /// comes online, at which point ContentView routes back to
+    /// WebAppView — no user tap required.
+    private func autoReconnect() async {
         localError = nil
-        reconnecting = true
-        defer { reconnecting = false }
-
-        // If iOS quietly disabled or lost track of the profile, refresh
-        // first so we have a live NETunnelProviderManager to poke.
         await tunnel.refresh()
 
-        // If the profile got removed (state went to .idle) we can't
-        // startVPNTunnel — kick the user back to the install flow.
         if tunnel.state == .idle {
+            // Profile got fully removed — bail to the install flow.
             vmState.tunnelInstalled = false
             vmState.persist()
             return
         }
 
         do {
+            try await tunnel.ensureSelected()
             try tunnel.connect()
         } catch {
             localError = error.localizedDescription
         }
     }
 
-    private func openAppSettings() {
-        // Best we can do from a third-party iOS app — Apple removed
-        // deep-linking to Settings → General → VPN sub-pages.
+    /// Try to deep-link to Settings → General → VPN so the ConceptsOS
+    /// VPN row is one tap away. `App-Prefs:` is an undocumented but
+    /// widely-used private URL scheme; if iOS refuses (or on a future
+    /// version that locks it down), fall back to our app's own
+    /// Settings page, from which the "VPN" row is reachable via the
+    /// Settings back-button.
+    private func openVPNSettings() {
+        let deepLinks = [
+            "App-Prefs:root=General&path=VPN",
+            "App-Prefs:root=VPN",
+            "prefs:root=General&path=VPN",
+        ]
+        for s in deepLinks {
+            if let url = URL(string: s), UIApplication.shared.canOpenURL(url) {
+                UIApplication.shared.open(url)
+                return
+            }
+        }
         if let url = URL(string: UIApplication.openSettingsURLString) {
             UIApplication.shared.open(url)
         }

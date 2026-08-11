@@ -11,10 +11,14 @@
 //   3. Relaunch ConceptsOS. Because the tunnel is now disconnected but
 //      `tunnelInstalled` is still true, ContentView must render
 //      VPNDisconnectedView instead of WebAppView.
-//   4. Assert the disconnected view + its Reconnect button exist.
-//   5. Tap Reconnect. The button switches to "Connecting…".
-//   6. Wait for tunnel to reconnect → we should land back on
-//      WebAppView.
+//   4. Assert the disconnected view is showing (and WebAppView is
+//      NOT). Reconnect happens automatically — no user tap needed —
+//      because VPNDisconnectedView.onAppear ensures our profile is
+//      selected and calls startVPNTunnel().
+//   5. Wait for tunnel to reconnect → we should land back on
+//      WebAppView, driven entirely by NEVPNStatusDidChange.
+//   6. Also sanity-check that the "Open VPN Settings" button exists
+//      (it's how the user recovers if auto-reconnect can't succeed).
 //
 // Where this runs:
 //   Physical iPhone via `mac-mini` — same prereqs as appium-e2e.mjs.
@@ -160,13 +164,17 @@ try {
   // If the user was previously fully set up, tunnelInstalled == true
   // AND session is present, so ContentView should route straight to
   // VPNDisconnectedView (skipping Welcome / Provisioning / Install).
-  const view = await waitForAcc('vpnDisconnectedView', 20_000);
+  await waitForAcc('vpnDisconnectedView', 20_000);
   console.log('  ✓ vpnDisconnectedView visible');
   await waitForAcc('vpnDisconnectedHeadline');
   await waitForAcc('vpnDisconnectedSubhead');
-  await waitForAcc('vpnReconnectButton');
   await waitForAcc('vpnOpenSettingsButton');
   await waitForAcc('vpnSignOutButton');
+  // Reconnect button was removed — auto-reconnect fires on view
+  // appear + NEVPNStatusDidChange takes us to WebAppView the moment
+  // the tunnel is up.
+  const reconnectBtn = await findAcc('vpnReconnectButton');
+  if (reconnectBtn) throw new Error('vpnReconnectButton should have been removed');
   await shot('03_disconnected_view');
 
   // The WebAppView must NOT be rendered while disconnected.
@@ -174,14 +182,13 @@ try {
   if (web) throw new Error('webAppView is showing while VPN is disconnected — regression!');
   console.log('  ✓ webAppView correctly absent');
 
-  console.log('== step 4: tap Reconnect ==');
-  const ok = await tapByLabel('vpnReconnectButton');
-  if (!ok) throw new Error('could not tap vpnReconnectButton');
-  await shot('04_after_reconnect_tap');
-
-  console.log('== step 5: wait for WebAppView (tunnel came up) ==');
+  console.log('== step 4: wait for automatic reconnect → WebAppView ==');
+  // No tap needed. VPNDisconnectedView.autoReconnect() saved our
+  // profile back as `isEnabled = true` and called startVPNTunnel();
+  // NEVPNStatusDidChange should flip us to .connected within a few
+  // seconds and ContentView will render WebAppView automatically.
   await waitForAcc('webAppView', 60_000);
-  await shot('05_reconnected_webapp');
+  await shot('04_reconnected_webapp');
 
   console.log('== DONE ==');
 } catch (e) {

@@ -118,6 +118,19 @@ final class TunnelManager: ObservableObject {
         manager?.connection.stopVPNTunnel()
     }
 
+    /// Make sure our profile is the *selected* VPN configuration in
+    /// system settings (`isEnabled = true`) and re-saved. When the user
+    /// opens Settings → VPN, ours is the one with the check mark next
+    /// to it, so a single tap of the master switch brings us back up.
+    /// Also a no-op speed bump if the profile is already enabled.
+    func ensureSelected() async throws {
+        guard let manager = manager else { return }
+        if manager.isEnabled { return }
+        manager.isEnabled = true
+        try await manager.saveToPreferences()
+        try await manager.loadFromPreferences()
+    }
+
     /// Remove the VPN profile entirely — used for full signout.
     func uninstall() async {
         guard let manager = manager else { return }
