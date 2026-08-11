@@ -20,14 +20,14 @@
         <string>packet-tunnel-provider</string>
     </array>
 
-    <!-- App Group is shared between the main app and the packet-tunnel
-         extension. We don't actually use it for shared storage today
-         (the wg config travels inside the VPN profile itself), but iOS
-         requires the extension to belong to the same App Group as its
-         host app when using NETunnelProviderManager. -->
-    <key>com.apple.security.application-groups</key>
-    <array>
-        <string>group.ai.humata.ConceptsOS</string>
-    </array>
+    <!-- (No App Group intentionally.) We considered
+         group.ai.humata.ConceptsOS for sharing state between the app
+         and the packet-tunnel extension, but the wg config we need to
+         hand off already crosses the boundary via the
+         NETunnelProviderProtocol.providerConfiguration dict, so App
+         Groups aren't required. Skipping avoids the extra developer-
+         portal registration step (App Group creation isn't exposed on
+         the App Store Connect API and would have to be clicked in the
+         web UI). -->
 </dict>
 </plist>
