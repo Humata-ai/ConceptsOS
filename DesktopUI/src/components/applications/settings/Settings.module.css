@@ -1,0 +1,161 @@
+.Container {
+	--tabs-width: 10rem;
+
+	flex: 1;
+	display: flex;
+	width: 100%;
+	height: 100%;
+	background-color: var(--background-color-c);
+}
+
+.Tabs {
+	display: flex;
+	gap: 0.25rem;
+	flex-direction: column;
+	min-width: calc(var(--tabs-width) / 2);
+	width: var(--tabs-width);
+	height: 100%;
+	max-width: 50%;
+	padding: 0.5rem;
+	margin: 0;
+	background-color: var(--background-color-ba);
+	resize: horizontal;
+	overflow: hidden;
+}
+
+.Tab-button {
+	display: flex;
+	gap: 0.5rem;
+	align-items: center;
+	width: 100%;
+	min-width: fit-content;
+	padding: 0.75rem;
+	border-radius: 0.5rem;
+	font-size: 0.875rem;
+}
+
+.Tab-button.Active-tab {
+	background-color: var(--background-color-a);
+}
+
+.Tab-button:not(.Active-tab):hover,
+.Tab-button:not(.Active-tab):focus-visible {
+	background-color: hsla(var(--background-color-a-hsl), 50%);
+}
+
+.Tab-button > svg {
+	height: 1.35rem;
+	aspect-ratio: 1;
+}
+
+.Tab-button > p {
+	margin: 0;
+}
+
+.Tab-panel {
+	flex: 1;
+	display: flex;
+	flex-direction: column;
+	align-content: flex-start;
+	height: 100%;
+	padding: 0.5rem 1rem;
+	overflow: auto;
+}
+
+.Tab-panel:not(.Active-panel) {
+	display: none;
+}
+
+.Option {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	justify-content: flex-start;
+	text-align: start;
+	width: 100%;
+}
+
+.Option > .Label {
+	color: var(--foreground-color-a);
+}
+
+.Input {
+	display: flex;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.Input > label {
+	flex: 1;
+	display: flex;
+}
+
+.Image-select {
+	min-width: 10rem;
+	max-width: 100%;
+}
+
+.Image-select > input {
+	position: absolute;
+	opacity: 0;
+	width: 0;
+	height: 0;
+}
+
+.Image-select > input:hover + img,
+.Image-select > input:focus-visible + img {
+	filter: brightness(110%);
+}
+
+.Image-select > input:checked + img {
+	outline: 0.25em solid var(--foreground-color-a);
+}
+
+.Image-select > img {
+	width: 100%;
+	height: 100%;
+	border-radius: 0.5rem;
+	transition: filter 100ms ease-in-out;
+	cursor: pointer;
+}
+
+.Button-group {
+	display: flex;
+	gap: 1rem;
+	flex-wrap: wrap;
+	margin: 0.75rem 0;
+}
+
+.Button-group .Button {
+	margin-bottom: 0;
+}
+
+.Button {
+	--normal-color: var(--background-color-a) !important;
+	--hover-color: var(--background-color-b) !important;
+
+	margin-bottom: 0.75rem !important;
+	padding: 0.5rem 1rem;
+	border-radius: 0.5rem;
+}
+
+.Button-red {
+	--text-color: var(--background-color-a) !important;
+	--normal-color: var(--red-a) !important;
+	--hover-color: var(--red-b) !important;
+}
+
+.Progress-bar-container {
+	width: 100%;
+	max-width: 35rem;
+}
+
+.Progress-bar {
+	width: 100% !important;
+}
+
+.Progress-bar-labels {
+	display: flex;
+	justify-content: space-between;
+	width: 100%;
+}

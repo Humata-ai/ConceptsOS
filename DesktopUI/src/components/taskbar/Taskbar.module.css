@@ -1,0 +1,128 @@
+:root {
+	--taskbar-height: 3rem;
+	--taskbar-color: rgba(0, 0, 0, 75%);
+	--taskbar-button-hover-color: rgba(255, 255, 255, 5%);
+	--taskbar-filter: blur(1rem);
+}
+
+.Taskbar {
+	position: fixed;
+	display: flex;
+	bottom: 0;
+	left: 0;
+	width: 100%;
+	height: var(--taskbar-height);
+	background-color: var(--taskbar-color);
+	backdrop-filter: var(--taskbar-filter);
+	z-index: 10;
+}
+
+.Taskbar button {
+	display: flex;
+	align-items: center;
+	color: var(--foreground-color-a);
+	background: none;
+	cursor: pointer;
+	border: none;
+	outline: none;
+	transition: background-color 100ms ease-in-out;
+	z-index: -1;
+}
+
+.Taskbar button:hover,
+.Taskbar button:focus-visible {
+	background-color: var(--taskbar-button-hover-color);
+}
+
+.Home-container,
+.Search-container {
+	position: relative;
+	padding: 0 !important;
+}
+
+.Home-button * {
+	fill: var(--foreground-color-a);
+	filter: none;
+}
+
+.Menu-icons,
+.App-icons-inner {
+	display: flex;
+	align-items: center;
+	height: 100%;
+}
+
+.App-icons {
+	position: relative;
+	width: 100%;
+	height: auto;
+	overflow: hidden;
+	pointer-events: none;
+}
+
+.App-icons-inner {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	overflow-x: auto;
+	overflow-y: hidden;
+	pointer-events: auto;
+	z-index: -1;
+}
+
+.App-icons-inner::-webkit-scrollbar {
+	display: none;
+}
+
+.App-icons-inner > *,
+.Menu-button {
+	height: 100%;
+	padding: 0.75rem;
+}
+
+.App-icons-inner > * > svg,
+.Menu-button > svg {
+	height: 1.25rem;
+}
+
+.App-icons-inner div,
+.App-icons-inner div > svg,
+.Menu-icons div,
+.Menu-icons div > svg {
+	height: 100%;
+	width: auto;
+}
+
+.Util-icons {
+	display: flex;
+	gap: 0;
+	justify-content: flex-end;
+	align-items: center;
+	height: 100%;
+	margin-left: auto;
+	padding-left: 0.5rem;
+	z-index: -1;
+}
+
+.Util-icons > * {
+	height: 100%;
+	width: min-content;
+	margin: 0;
+	padding: 0.4rem;
+}
+
+.Util-icons > * > svg {
+	height: 1rem;
+	width: 1rem;
+	aspect-ratio: 1;
+}
+
+#desktop-button {
+	border-left: 1px solid rgba(255, 255, 255, 50%);
+	height: 100%;
+	width: 0.5rem;
+	padding: 0;
+	margin-left: 1rem;
+}

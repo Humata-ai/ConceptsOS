@@ -1,0 +1,34 @@
+# ConceptsOS-VM: single-origin front door.
+#
+# Substitutions applied by entrypoint.sh at container start:
+#   {$CADDY_BIND}   host:port caddy listens on
+#                   (external mode: :3000, embedded mode: <wg0-ip>:3000)
+#   {$AGENTCHAT_UPSTREAM}   127.0.0.1:3050  (Next.js on loopback)
+
+{
+	# We terminate no TLS here — traffic to us is either plain-HTTP over
+	# a WireGuard tunnel (embedded) or in-cluster ClusterIP (external).
+	auto_https off
+	admin off
+	persist_config off
+}
+
+{$CADDY_BIND} {
+	# AgentChat (Next.js). WebSockets (HMR isn't relevant in prod, but the
+	# Next.js runtime uses fetch streaming which reverse_proxy handles).
+	# We keep the /agent/ prefix in the upstream request so Next.js sees
+	# the same paths in dev and prod. AgentChat's Next config needs to
+	# know about this basePath — see AgentChat/next.config.ts.
+	handle /agent* {
+		reverse_proxy {$AGENTCHAT_UPSTREAM} {
+			header_up Host {upstream_hostport}
+		}
+	}
+
+	# DesktopUI static build. SPA fallback so client-side routes work.
+	handle {
+		root * /srv/desktopui
+		try_files {path} /index.html
+		file_server
+	}
+}

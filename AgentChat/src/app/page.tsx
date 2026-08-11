@@ -1,6 +1,12 @@
 "use client";
 
 import { useCallback, useContext, useEffect, useRef, useState } from "react";
+
+// Prefix for API fetches. In the ConceptsOS-VM pod, AgentChat lives at
+// /agent/*, so `/api/sessions` really means `/agent/api/sessions`. Next
+// handles this automatically for next/link + next/image but NOT for
+// fetch — we prepend explicitly. See next.config.ts.
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 import AppBar from "@mui/material/AppBar";
 import Box from "@mui/material/Box";
 import Drawer from "@mui/material/Drawer";
@@ -100,7 +106,7 @@ export default function Page() {
   // Load sessions on mount
   useEffect(() => {
     (async () => {
-      const res = await fetch("/api/sessions");
+      const res = await fetch(`${BASE_PATH}/api/sessions`);
       const data = await res.json();
       const list: SessionSummary[] = data.sessions ?? [];
       setSessions(list);
@@ -134,7 +140,7 @@ export default function Page() {
     });
     (async () => {
       try {
-        const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`);
+        const res = await fetch(`${BASE_PATH}/api/sessions/${encodeURIComponent(id)}`);
         if (!res.ok) return;
         const data = (await res.json()) as { messages: UiMessage[] };
         if (!data.messages?.length) return;
@@ -167,7 +173,7 @@ export default function Page() {
   const activeChat = activeId ? chats[activeId] ?? emptyChat() : emptyChat();
 
   const newChat = useCallback(async () => {
-    const res = await fetch("/api/sessions", { method: "POST", body: "{}" });
+    const res = await fetch(`${BASE_PATH}/api/sessions`, { method: "POST", body: "{}" });
     const data = await res.json();
     const s: SessionSummary = data.session;
     setSessions((prev) => [s, ...prev.filter((x) => x.id !== s.id)]);
@@ -179,7 +185,7 @@ export default function Page() {
 
   const deleteChat = useCallback(
     async (id: string) => {
-      await fetch(`/api/sessions?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      await fetch(`${BASE_PATH}/api/sessions?id=${encodeURIComponent(id)}`, { method: "DELETE" });
       setSessions((prev) => prev.filter((x) => x.id !== id));
       setChats((prev) => {
         const c = { ...prev };
@@ -224,7 +230,7 @@ export default function Page() {
 
     let streamError: string | undefined;
     try {
-      const res = await fetch("/api/chat", {
+      const res = await fetch(`${BASE_PATH}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, text }),
@@ -246,7 +252,7 @@ export default function Page() {
 
   const abort = useCallback(async () => {
     if (!activeId) return;
-    await fetch("/api/abort", {
+    await fetch(`${BASE_PATH}/api/abort`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id: activeId }),

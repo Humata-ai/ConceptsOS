@@ -1,0 +1,68 @@
+.Container-outer {
+	position: absolute;
+	left: 0;
+	bottom: 100%;
+	height: auto !important;
+	overflow: hidden;
+}
+
+.Container-inner {
+	opacity: 1;
+	display: flex;
+	min-width: 16rem;
+	max-width: 32rem;
+	background-color: rgba(25, 25, 25, 75%);
+	border-top-left-radius: 0.5rem;
+	border-top-right-radius: 0.5rem;
+	border-bottom-right-radius: 0.5rem;
+	backdrop-filter: var(--taskbar-filter);
+	transform: none;
+	transition: opacity 200ms ease-in-out, transform 200ms ease-in-out;
+	overflow: hidden;
+	resize: horizontal;
+}
+
+.Container-outer:not(.Active) {
+	pointer-events: none;
+}
+
+.Container-outer:not(.Active) .Container-inner {
+	opacity: 0;
+	transform: translateY(100px);
+}
+
+.Buttons {
+	display: flex;
+	flex-direction: column-reverse;
+	align-items: center;
+	padding: 0.25rem;
+	margin-top: auto;
+	z-index: -1;
+}
+
+.Buttons > button {
+	padding: 0.5rem;
+	border-radius: 0.5rem;
+}
+
+.Buttons > button > svg {
+	height: 1.5rem;
+}
+
+.Apps {
+	display: flex;
+	flex-direction: column;
+	width: 100% !important;
+	max-height: 20rem;
+	padding: 1rem;
+	padding-right: 0.25rem;
+	padding-bottom: 0;
+}
+
+.Apps > h1 {
+	width: 100%;
+	text-align: left;
+	font-size: 1rem;
+	margin: 0;
+	margin-bottom: 0.5rem;
+}

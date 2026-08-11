@@ -1,0 +1,34 @@
+.Container {
+	display: flex;
+	flex-direction: column;
+	width: 100%;
+	height: 100%;
+	text-align: start;
+}
+
+.Container p,
+.Container div,
+.Container span,
+.Container textarea {
+	font-size: 1em;
+}
+
+.View {
+	width: 100%;
+	height: 100%;
+	padding: 1rem;
+	color: var(--foreground-color-a);
+	background-color: var(--background-color-c);
+	border: none;
+	outline: none;
+	font-size: 1rem;
+	font-family: var(--body-font-family);
+	resize: none;
+	overflow: auto;
+}
+
+.View img {
+	max-width: 100%;
+	object-fit: contain;
+	border-radius: 0.5rem;
+}

@@ -13,6 +13,13 @@ app/node_modules/
 app/.next/
 ChatUI/node_modules/
 ChatUI/.next/
+AgentChat/node_modules/
+AgentChat/.next/
+AgentChat/test-results/
+
+# DesktopUI (Prozilla-OS derived CRA app)
+DesktopUI/node_modules/
+DesktopUI/build/
 
 # api service (Next.js)
 api/node_modules/
