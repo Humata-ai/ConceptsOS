@@ -13,19 +13,23 @@
 #   cd ~/github/Humata-ai/ConceptsOS
 #   docker build -f ConceptsOS-VM/Dockerfile.dev -t conceptsos-vm:dev .
 #
-# RUN (mount SSH so `git push` uses your key; expose AgentChat dev port):
+# RUN (mount SSH so `git push` uses your key; expose both dev ports):
 #
 #   docker run --rm -it \
-#     -p 3050:3050 \
+#     -p 3000:3000 -p 3050:3050 \
 #     -v "$HOME/.ssh:/root/.ssh:ro" \
 #     -v "$HOME/.gitconfig:/root/.gitconfig:ro" \
 #     conceptsos-vm:dev
 #
-# Default CMD runs AgentChat's `npm run dev` (HMR on :3050). To hack on
-# DesktopUI too, open another shell in the container:
+# Default CMD runs BOTH dev servers side-by-side (see
+# docker/entrypoint.dev.sh):
 #
-#   docker exec -it <container> bash
-#   cd /workspace/ConceptsOS/DesktopUI && npm start   # CRA dev on :3000
+#   DesktopUI (CRA) HMR   → :3000   (matches prod's public port)
+#   AgentChat (Next.js)   → :3050
+#
+# The k8s pod's readiness probe and Ingress both hit :3000, so DesktopUI
+# is what users see at the site root; AgentChat's UI is available at
+# :3050/chat (or wired through by DesktopUI's AI Agent tile).
 #
 # Secrets: .env / .env.local files are excluded via .dockerignore. Populate
 # them at runtime (bind-mount or `docker run --env-file`).
@@ -68,6 +72,9 @@ ENV NODE_ENV=development \
 EXPOSE 3050/tcp
 EXPOSE 3000/tcp
 
-WORKDIR /workspace/ConceptsOS/AgentChat
-ENTRYPOINT ["/usr/bin/tini", "--"]
-CMD ["npm", "run", "dev"]
+# Dual-server entrypoint (DesktopUI :3000 + AgentChat :3050).
+COPY docker/entrypoint.dev.sh /usr/local/bin/entrypoint.dev.sh
+RUN chmod +x /usr/local/bin/entrypoint.dev.sh
+
+WORKDIR /workspace/ConceptsOS
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/entrypoint.dev.sh"]
