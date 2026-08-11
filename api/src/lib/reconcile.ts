@@ -11,7 +11,6 @@
 // don't; there's a single interval in this process).
 
 import { adminClient } from "./supabase";
-import { mintUserKey } from "./anthropic";
 import { ensureUserPod, deleteUserPod } from "./k8s";
 import { upsertPeer, removePeer } from "./gateway";
 import { env } from "./env";
@@ -20,13 +19,6 @@ const log = (...args: unknown[]) => console.log("[reconcile]", ...args);
 
 let running = false;
 let timer: ReturnType<typeof setInterval> | null = null;
-
-// Cache the Anthropic key values in-process; we never persist them to
-// Supabase. If the api pod restarts we re-mint (workspace mode) or reuse
-// the same shared key (shared-key mode). In workspace mode, restart would
-// orphan the old key — acceptable for V1; revocation happens on account
-// delete.
-const keyCache = new Map<string, string>();
 
 export function startReconcileLoop(): void {
   if (!env.reconcileEnabled()) {
@@ -100,19 +92,7 @@ async function reconcileOne(row: any): Promise<void> {
     return;
   }
 
-  // 1. Anthropic key: mint or reuse.
-  let anthropicKey = keyCache.get(uid);
-  if (!anthropicKey) {
-    const minted = await mintUserKey(uid);
-    anthropicKey = minted.keyValue;
-    keyCache.set(uid, anthropicKey);
-    await db
-      .from("vms")
-      .update({ anthropic_key_id: minted.keyId })
-      .eq("user_id", uid);
-  }
-
-  // 2. Mark provisioning while we work.
+  // Mark provisioning while we work.
   if (row.status !== "provisioning") {
     await db
       .from("vms")
@@ -120,10 +100,10 @@ async function reconcileOne(row: any): Promise<void> {
       .eq("user_id", uid);
   }
 
-  // 3. Ensure k8s objects.
+  // Ensure k8s objects. Anthropic access is via the api service's
+  // /api/llm proxy — no key is projected into the pod.
   const k8sResult = await ensureUserPod({
     userId: uid,
-    anthropicKey,
     wgClientIp: row.wg_client_ip,
   });
 
@@ -136,8 +116,8 @@ async function reconcileOne(row: any): Promise<void> {
     })
     .eq("user_id", uid);
 
-  // 4. Push wg peer to gateway. We only push once the pod's Service has
-  //    a ClusterIP; without one there's nothing to DNAT to.
+  // Push wg peer to gateway. We only push once the pod's Service has
+  // a ClusterIP; without one there's nothing to DNAT to.
   if (!k8sResult.serviceClusterIp) {
     log(`user ${uid}: awaiting service ClusterIP`);
     return;
@@ -152,7 +132,7 @@ async function reconcileOne(row: any): Promise<void> {
     podPort: 3000,
   });
 
-  // 5. Poll the pod's readiness. For V1 we just trust the pod's readiness
+  // Poll the pod's readiness. For V1 we just trust the pod's readiness
   //    probe — if k8s says the pod is Ready, we flip to ready.
   const { isPodReady } = await import("./k8s");
   const podReady = await isPodReady(k8sResult.namespace, k8sResult.podName);

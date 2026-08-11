@@ -42,7 +42,6 @@ export function podNameFor(userId: string): string {
 
 export interface EnsureUserPodArgs {
   userId: string;
-  anthropicKey: string;
   wgClientIp: string;
 }
 
@@ -55,7 +54,6 @@ export async function ensureUserPod(args: EnsureUserPodArgs): Promise<{
   const name = podNameFor(args.userId);
 
   await ensureNamespace(ns);
-  await ensureAnthropicSecret(ns, name, args.anthropicKey);
   await ensureStatefulSet(ns, name, args.userId, args.wgClientIp);
   const svcIp = await ensureService(ns, name, args.userId, args.wgClientIp);
 
@@ -70,21 +68,6 @@ async function ensureNamespace(ns: string): Promise<void> {
     await core().createNamespace({
       metadata: { name: ns, labels: { "app.kubernetes.io/part-of": "conceptsos" } },
     });
-  }
-}
-
-async function ensureAnthropicSecret(ns: string, name: string, key: string): Promise<void> {
-  const secretName = `${name}-anthropic`;
-  const body: k8s.V1Secret = {
-    metadata: { name: secretName, labels: { "conceptsos.io/user-pod": name } },
-    type: "Opaque",
-    stringData: { ANTHROPIC_API_KEY: key },
-  };
-  try {
-    await core().replaceNamespacedSecret(secretName, ns, body);
-  } catch (e) {
-    if (!isNotFound(e)) throw e;
-    await core().createNamespacedSecret(ns, body);
   }
 }
 
@@ -124,12 +107,14 @@ async function ensureStatefulSet(
                 { name: "CONCEPTSOS_WG", value: "external" },
                 { name: "CONCEPTSOS_USER_ID", value: userId },
                 { name: "PORT", value: "3000" },
+                // The pod talks to Anthropic via our reverse proxy,
+                // which injects the org key server-side. The pod
+                // itself holds no Anthropic credential.
                 {
-                  name: "ANTHROPIC_API_KEY",
-                  valueFrom: {
-                    secretKeyRef: { name: `${name}-anthropic`, key: "ANTHROPIC_API_KEY" },
-                  },
+                  name: "ANTHROPIC_BASE_URL",
+                  value: "http://conceptsos-api.conceptsos-system.svc.cluster.local/api/llm",
                 },
+                { name: "ANTHROPIC_API_KEY", value: "proxied" },
               ],
               ports: [{ containerPort: 3000, name: "http" }],
               readinessProbe: {
@@ -210,6 +195,8 @@ export async function deleteUserPod(userId: string): Promise<void> {
   };
   await swallow404(apps().deleteNamespacedStatefulSet(name, ns));
   await swallow404(core().deleteNamespacedService(name, ns));
+  // Legacy: pre-proxy pods had a per-user Anthropic key Secret. New
+  // pods don't, but keep the delete for cleanup of any older pods.
   await swallow404(core().deleteNamespacedSecret(`${name}-anthropic`, ns));
   await swallow404(core().deleteNamespacedPersistentVolumeClaim(`data-${name}-0`, ns));
 }
