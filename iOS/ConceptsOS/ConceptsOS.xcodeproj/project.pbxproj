@@ -31,6 +31,7 @@
 		DCA2740DE186A1021288FD4A /* WireGuardKit in Frameworks */ = {isa = PBXBuildFile; productRef = 631DA886C8AAAF34B6195A8F /* WireGuardKit */; };
 		F0078C6789CAB9F7DAB81A7F /* InstallTunnelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C130EE2B5650CBCE289745D2 /* InstallTunnelView.swift */; };
 		F0078C6789CAB9F7DAB81AF0 /* VPNDisconnectedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C130EE2B5650CBCE289745F0 /* VPNDisconnectedView.swift */; };
+		F0078C6789CAB9F7DAB81B01 /* VPNExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C130EE2B5650CBCE28974601 /* VPNExplainerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -83,6 +84,7 @@
 		B100000000000000000000BB /* WebAppView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebAppView.swift; sourceTree = "<group>"; };
 		C130EE2B5650CBCE289745D2 /* InstallTunnelView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = InstallTunnelView.swift; sourceTree = "<group>"; };
 		C130EE2B5650CBCE289745F0 /* VPNDisconnectedView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VPNDisconnectedView.swift; sourceTree = "<group>"; };
+		C130EE2B5650CBCE28974601 /* VPNExplainerView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VPNExplainerView.swift; sourceTree = "<group>"; };
 		CC8A41EDEC5B682C6B107DF7 /* WGQuickParser.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WGQuickParser.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -208,6 +210,7 @@
 				B100000000000000000000BB /* WebAppView.swift */,
 				C130EE2B5650CBCE289745D2 /* InstallTunnelView.swift */,
 				C130EE2B5650CBCE289745F0 /* VPNDisconnectedView.swift */,
+				C130EE2B5650CBCE28974601 /* VPNExplainerView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -371,6 +374,7 @@
 				A100000000000000000000BB /* WebAppView.swift in Sources */,
 				F0078C6789CAB9F7DAB81A7F /* InstallTunnelView.swift in Sources */,
 				F0078C6789CAB9F7DAB81AF0 /* VPNDisconnectedView.swift in Sources */,
+				F0078C6789CAB9F7DAB81B01 /* VPNExplainerView.swift in Sources */,
 				0585150837E83BBEFF66C6D8 /* TunnelManager.swift in Sources */,
 				C72ADEAE5D9A79DBCA5AD1A6 /* WGQuickParser.swift in Sources */,
 			);
