@@ -47,19 +47,19 @@ struct VPNExplainerView: View {
                     symbol: "lock.shield.fill",
                     tint: .green,
                     title: "End-to-end encrypted",
-                    body: "Traffic is sealed between this iPhone and your VM."
+                    subtitle: "Traffic is sealed between this iPhone and your VM."
                 )
                 BulletRow(
                     symbol: "point.3.filled.connected.trianglepath.dotted",
                     tint: .blue,
                     title: "Only reaches your VM",
-                    body: "No general internet traffic is routed through us."
+                    subtitle: "No general internet traffic is routed through us."
                 )
                 BulletRow(
                     symbol: "iphone.gen3",
                     tint: .orange,
                     title: "iOS will ask permission next",
-                    body: "You’ll see a system prompt to add a VPN configuration. Tap Allow."
+                    subtitle: "You’ll see a system prompt to add a VPN configuration. Tap Allow."
                 )
             }
             .padding(.horizontal, 28)
@@ -94,7 +94,7 @@ private struct BulletRow: View {
     let symbol: String
     let tint: Color
     let title: String
-    let body: String
+    let subtitle: String
 
     var body: some View {
         HStack(alignment: .top, spacing: 14) {
@@ -106,7 +106,7 @@ private struct BulletRow: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
-                Text(body)
+                Text(subtitle)
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
