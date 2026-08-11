@@ -1,7 +1,11 @@
 # Two Services for the wg-gateway pod:
 #
-#  * wg-gateway-public — LoadBalancer, UDP :51820. This is the public
-#    endpoint at api.conceptsos.com (via DNS A record).
+#  * wg-gateway-public — LoadBalancer, UDP :51820. Reserved static
+#    regional IP `conceptsos-wg-gateway-ip` (35.253.153.78 in
+#    us-central1). This IP is baked into every user's WireGuard client
+#    config at signup (env WG_ENDPOINT on the api pod), so it must not
+#    change. Do NOT reuse api.conceptsos.com here — that resolves to
+#    the HTTPS Ingress on a different IP.
 #  * wg-gateway        — ClusterIP, TCP :8080. Internal admin API called
 #    by the api service.
 ---
@@ -13,6 +17,7 @@ metadata:
   labels: { app: wg-gateway }
 spec:
   type: LoadBalancer
+  loadBalancerIP: 35.253.153.78 # reserved: gcloud address `conceptsos-wg-gateway-ip`
   externalTrafficPolicy: Local  # preserve client source IP, though wg
                                 # doesn't care since it's UDP w/ crypto
   selector: { app: wg-gateway }

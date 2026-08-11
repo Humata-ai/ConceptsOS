@@ -23,6 +23,18 @@ resource "google_compute_global_address" "api" {
   depends_on = [google_project_service.services]
 }
 
+# Regional static IP for the WireGuard UDP LoadBalancer
+# (Service wg-gateway-public). This IP is baked into every user's WG
+# client config at signup (via WG_ENDPOINT on the api pod), so it MUST
+# stay stable across Service recreations and cluster rebuilds.
+resource "google_compute_address" "wg_gateway" {
+  project = google_project.conceptsos.project_id
+  name    = "conceptsos-wg-gateway-ip"
+  region  = var.region
+
+  depends_on = [google_project_service.services]
+}
+
 # Separate node pool for user pods. Keeps a noisy user off the same node
 # as the api/wg-gateway control plane.
 resource "google_container_node_pool" "users" {
@@ -80,4 +92,9 @@ resource "google_secret_manager_secret" "anthropic_admin_key" {
 output "api_static_ip" {
   value       = google_compute_global_address.api.address
   description = "Point api.conceptsos.com DNS A record at this IP."
+}
+
+output "wg_gateway_static_ip" {
+  value       = google_compute_address.wg_gateway.address
+  description = "Public UDP:51820 endpoint for WireGuard. Baked into WG_ENDPOINT on the api deployment."
 }

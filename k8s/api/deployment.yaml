@@ -40,8 +40,13 @@ spec:
               value: "10"
             - name: WG_CLIENT_SUBNET
               value: "10.10.0.0/16"
+            # WireGuard UDP public endpoint. This is the LoadBalancer IP
+            # of the `wg-gateway-public` Service, reserved as the static
+            # regional address `conceptsos-wg-gateway-ip`. NOT the same
+            # as api.conceptsos.com (that DNS points at the HTTPS
+            # Ingress, which does not carry UDP).
             - name: WG_ENDPOINT
-              value: "api.conceptsos.com:51820"
+              value: "35.253.153.78:51820"
             - name: WG_GATEWAY_URL
               value: "http://wg-gateway.conceptsos-system.svc.cluster.local:8080"
             - name: RECONCILE_ENABLED
