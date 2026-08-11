@@ -75,6 +75,18 @@ echo "==> Using device: $DEVICE_ID"
 # 2. Xcode 26 (needed for iOS 26 SDK).
 sudo -n xcode-select --switch "$XCODE_APP" 2>/dev/null || true
 
+# 2b. Whitelist codesign / apple-tool for the auto-provisioned identity's
+# private key so it can be used non-interactively over SSH. Without
+# this, codesign fails with `errSecInternalComponent` /
+# `CSSMERR_CSP_NO_USER_INTERACTION` when signing the packet-tunnel
+# extension. See iOS/README.md "WireGuard extension" section.
+if [[ -n "${MAC_KEYCHAIN_PW:-}" ]]; then
+  security unlock-keychain -p "$MAC_KEYCHAIN_PW" ~/Library/Keychains/login.keychain-db 2>/dev/null || true
+  security set-key-partition-list -S apple-tool:,apple:,codesign: \
+    -s -k "$MAC_KEYCHAIN_PW" ~/Library/Keychains/login.keychain-db \
+    >/dev/null 2>&1 || true
+fi
+
 # 3. Build.
 cd "$PROJECT_DIR"
 BUILD_LOG="$(mktemp -t conceptsos-build.XXXXXX.log)"
