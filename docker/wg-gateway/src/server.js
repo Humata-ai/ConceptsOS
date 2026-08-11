@@ -71,16 +71,24 @@ async function applyPeer(p) {
     try { fs.unlinkSync(pskFile); } catch {}
   }
 
-  // 2. Add DNAT rule: source = this user's tunnel IP, dest port 3000,
-  //    forward to their pod's ClusterIP:port. We match on source so users
-  //    can dial the same "gateway" address (10.10.0.1:3000) and end up in
-  //    their own pod.
+  // 2. Add DNAT rule: source = this user's tunnel IP, ANY tcp port,
+  //    forward to their pod's ClusterIP (preserving the original
+  //    destination port). We match on source so each user can dial the
+  //    same "gateway" address (10.10.0.1) and land in their own pod.
+  //
+  //    Tailscale-style magic-port routing: <gateway-ip>:PORT →
+  //    <pod>:PORT for any TCP port. The k8s Service on the target must
+  //    list every port that should be reachable — see ensureService() in
+  //    api/src/lib/k8s.ts.
+  //
+  //    p.podPort is intentionally ignored here; kept in state for
+  //    backward compat with older API deployments.
   await ensureIptables([
     "-t", "nat", "-A", "PREROUTING",
     "-i", "wg0",
     "-s", p.clientIp,
-    "-p", "tcp", "--dport", "3000",
-    "-j", "DNAT", "--to-destination", `${p.podServiceIp}:${p.podPort}`,
+    "-p", "tcp",
+    "-j", "DNAT", "--to-destination", p.podServiceIp,
   ]);
   // Also allow the return path via FORWARD.
   await ensureIptables([
@@ -97,6 +105,16 @@ async function applyPeer(p) {
 
 async function removePeerRules(p) {
   await exec("wg", ["set", "wg0", "peer", p.wgPubkey, "remove"]).catch(() => {});
+  // Match the new any-port DNAT shape.
+  await deleteIptables([
+    "-t", "nat", "-D", "PREROUTING",
+    "-i", "wg0",
+    "-s", p.clientIp,
+    "-p", "tcp",
+    "-j", "DNAT", "--to-destination", p.podServiceIp,
+  ]);
+  // Also try the legacy dport-3000/port-pinned shape in case we're
+  // downgrading state that was written by the previous gateway version.
   await deleteIptables([
     "-t", "nat", "-D", "PREROUTING",
     "-i", "wg0",

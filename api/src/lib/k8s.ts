@@ -125,7 +125,19 @@ async function ensureStatefulSet(
                 // `Authorization: Bearer <key>`.
                 { name: "CONCEPTSOS_API_KEY", value: apiKey },
               ],
-              ports: [{ containerPort: 3000, name: "http" }],
+              ports: [
+                // DesktopUI (CRA in dev, or Next.js standalone serving
+                // baked DesktopUI + AgentChat in prod). This is the port
+                // the readiness probe hits and the primary port the wg
+                // gateway forwards to.
+                { containerPort: 3000, name: "http" },
+                // AgentChat's `next dev` (dev image only). In prod the
+                // container never binds this port, but declaring it is
+                // harmless — the Service below lists it either way so the
+                // wg-gateway can DNAT to <clusterIp>:3050 without
+                // Kubernetes filtering the port at the Service layer.
+                { containerPort: 3050, name: "agentchat" },
+              ],
               readinessProbe: {
                 httpGet: { path: "/", port: 3000 as any },
                 initialDelaySeconds: 5,
@@ -202,7 +214,14 @@ async function ensureService(
     spec: {
       type: "ClusterIP",
       selector: { "conceptsos.io/user-pod": name },
-      ports: [{ port: 3000, targetPort: 3000 as any, name: "http" }],
+      // The wg-gateway DNATs to this ClusterIP preserving the original
+      // destination port (tailscale-style), so every port a client
+      // should be able to reach must be listed here explicitly.
+      // Services do not blanket-forward ports even under DNAT.
+      ports: [
+        { port: 3000, targetPort: 3000 as any, name: "http" },
+        { port: 3050, targetPort: 3050 as any, name: "agentchat" },
+      ],
     },
   };
   try {
