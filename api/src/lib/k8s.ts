@@ -43,6 +43,8 @@ export function podNameFor(userId: string): string {
 export interface EnsureUserPodArgs {
   userId: string;
   wgClientIp: string;
+  /** Raw ConceptsOS API key, projected as $CONCEPTSOS_API_KEY into the pod. */
+  apiKey: string;
 }
 
 export async function ensureUserPod(args: EnsureUserPodArgs): Promise<{
@@ -54,7 +56,7 @@ export async function ensureUserPod(args: EnsureUserPodArgs): Promise<{
   const name = podNameFor(args.userId);
 
   await ensureNamespace(ns);
-  await ensureStatefulSet(ns, name, args.userId, args.wgClientIp);
+  await ensureStatefulSet(ns, name, args.userId, args.wgClientIp, args.apiKey);
   const svcIp = await ensureService(ns, name, args.userId, args.wgClientIp);
 
   return { podName: name, namespace: ns, serviceClusterIp: svcIp };
@@ -76,6 +78,7 @@ async function ensureStatefulSet(
   name: string,
   userId: string,
   wgClientIp: string,
+  apiKey: string,
 ): Promise<void> {
   const image = env.userPodImage();
   const storage = `${env.userPodStorageGb()}Gi`;
@@ -115,6 +118,10 @@ async function ensureStatefulSet(
                   value: "http://conceptsos-api.conceptsos-system.svc.cluster.local/api/llm",
                 },
                 { name: "ANTHROPIC_API_KEY", value: "proxied" },
+                // The pod's own identity to the LLM proxy. The pi
+                // anthropic-proxy extension forwards this as
+                // `Authorization: Bearer <key>`.
+                { name: "CONCEPTSOS_API_KEY", value: apiKey },
               ],
               ports: [{ containerPort: 3000, name: "http" }],
               readinessProbe: {

@@ -13,6 +13,7 @@
 import { adminClient } from "./supabase";
 import { ensureUserPod, deleteUserPod } from "./k8s";
 import { upsertPeer, removePeer } from "./gateway";
+import { ensureUserApiKey } from "./apikey";
 import { env } from "./env";
 
 const log = (...args: unknown[]) => console.log("[reconcile]", ...args);
@@ -100,11 +101,17 @@ async function reconcileOne(row: any): Promise<void> {
       .eq("user_id", uid);
   }
 
+  // Ensure the user has a ConceptsOS API key. Idempotent — returns
+  // the raw key from vms.pod_api_key on subsequent calls.
+  const apiKey = row.pod_api_key ?? (await ensureUserApiKey(uid));
+
   // Ensure k8s objects. Anthropic access is via the api service's
-  // /api/llm proxy — no key is projected into the pod.
+  // /api/llm proxy; the pod authenticates to the proxy with its own
+  // per-user API key (projected as $CONCEPTSOS_API_KEY).
   const k8sResult = await ensureUserPod({
     userId: uid,
     wgClientIp: row.wg_client_ip,
+    apiKey,
   });
 
   await db

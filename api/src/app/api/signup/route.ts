@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { authUserId, adminClient } from "@/lib/supabase";
 import { allocateClientIp, buildClientConfig, generatePreSharedKey } from "@/lib/wg";
+import { ensureUserApiKey } from "@/lib/apikey";
 import { env } from "@/lib/env";
 import { withLogging } from "@/lib/log";
 
@@ -22,9 +23,10 @@ const Body = z.object({
   wgPubkey: z.string().min(40).max(50), // wg pubkeys are 44 chars b64
 });
 
-export const POST = withLogging("signup", async (req: Request) => {
+export const POST = withLogging("signup", async (req, _ctx, log) => {
   const uid = await authUserId(req);
   if (!uid) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  log.userId = uid;
 
   let body: z.infer<typeof Body>;
   try {
@@ -38,6 +40,9 @@ export const POST = withLogging("signup", async (req: Request) => {
   // Return existing config if we already provisioned this user.
   const { data: existing } = await db.from("vms").select("*").eq("user_id", uid).maybeSingle();
   if (existing?.wg_client_ip && existing.wg_server_pubkey && existing.wg_preshared_key) {
+    // Backfill: ensure this user has an API key even if they signed up
+    // before the api_keys migration landed.
+    await ensureUserApiKey(uid);
     return NextResponse.json(vmResponse(existing));
   }
 
@@ -62,6 +67,10 @@ export const POST = withLogging("signup", async (req: Request) => {
   if (error) {
     return NextResponse.json({ error: "db_write_failed", detail: error.message }, { status: 500 });
   }
+
+  // Mint the user's ConceptsOS API key. This will be projected into their
+  // pod as $CONCEPTSOS_API_KEY and required by the LLM proxy.
+  await ensureUserApiKey(uid);
 
   const cfg = buildClientConfig({
     clientIp,

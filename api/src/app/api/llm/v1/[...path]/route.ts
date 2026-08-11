@@ -21,7 +21,9 @@
 // metering layer before opening real signups.
 
 import { env } from "@/lib/env";
-import { withLogging } from "@/lib/log";
+import { withLogging, type LogMeta } from "@/lib/log";
+import { requireApiKey } from "@/lib/authn";
+import { teeAnthropicUsage } from "@/lib/anthropic-usage";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -55,7 +57,15 @@ const FORWARD_RES_HEADERS = new Set([
   "retry-after",
 ]);
 
-async function proxy(req: Request, ctx: { params: Promise<{ path: string[] }> }): Promise<Response> {
+async function proxy(
+  req: Request,
+  ctx: { params: Promise<{ path: string[] }> },
+  log: LogMeta,
+): Promise<Response> {
+  // Authenticate the calling pod. On failure, return the 401 as-is.
+  const auth = await requireApiKey(req, log);
+  if (auth instanceof Response) return auth;
+
   const key = env.anthropicSharedKey();
   if (!key) {
     return new Response(
@@ -92,7 +102,12 @@ async function proxy(req: Request, ctx: { params: Promise<{ path: string[] }> })
     if (FORWARD_RES_HEADERS.has(k.toLowerCase())) outHeaders.set(k, v);
   }
 
-  return new Response(upstream.body, {
+  // Tee the response body so we can extract usage tokens without
+  // buffering or blocking the stream. Best-effort: if parsing fails, the
+  // request still succeeds and we just log without tokens.
+  const body = upstream.body ? teeAnthropicUsage(upstream.body, log) : null;
+
+  return new Response(body, {
     status: upstream.status,
     statusText: upstream.statusText,
     headers: outHeaders,
