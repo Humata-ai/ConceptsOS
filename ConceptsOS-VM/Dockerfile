@@ -50,9 +50,9 @@ RUN set -eux; \
 RUN npm install -g --no-audit --no-fund @earendil-works/pi-coding-agent@0.84.1
 
 # Global pi extension that redirects the built-in Anthropic provider through
-# our reverse proxy (see docker/pi-extensions/anthropic-proxy.ts). pi
+# our reverse proxy (see docker/pi-extensions/conceptsos-provider.ts). pi
 # auto-discovers *.ts files under ~/.pi/agent/extensions/.
-COPY docker/pi-extensions/anthropic-proxy.ts /root/.pi/agent/extensions/anthropic-proxy.ts
+COPY docker/pi-extensions/conceptsos-provider.ts /root/.pi/agent/extensions/conceptsos-provider.ts
 
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static

@@ -42,7 +42,7 @@ if we deviate, update this file in the same PR.
        │   │   (1 public UDP IP,     (ConceptsOS-VM image,   │
        │   │    routes by pubkey)     wg=external mode,      │
        │   │                          10GB PVC,              │
-       │   │                          ANTHROPIC_API_KEY env) │
+       │   │                          CONCEPTSOS_API_KEY env)│
        │   └─────────────────────────────────────────────────┘
        │
        └── WireGuard UDP ─► wg-gateway public IP ─► user's pod
@@ -64,7 +64,7 @@ iOS sends only the pubkey to `api`.
 | wg keys | Generated on iOS device at signup. Private key stays in iOS Keychain. Server only sees pubkey. |
 | wg client config | Returned to iOS **once at signup**, stored in Keychain. Not re-fetched on launch. |
 | LLM provider | **Anthropic only** for V1. |
-| LLM keys | **One shared Anthropic Workspace**, one API key per user, minted via Admin API at signup. Injected into pod as `ANTHROPIC_API_KEY` via K8s Secret. |
+| LLM keys | **One shared Anthropic Workspace**, one API key per user (minted server-side). The pod itself holds no Anthropic credential; it points at the api's reverse proxy (`CONCEPTSOS_BASE_URL`) and authenticates with a per-user `CONCEPTSOS_API_KEY`. The api injects the org Anthropic key server-side. |
 | LLM metering | Unlimited spend for V1. Hourly Cloud Run job pulls Anthropic usage API and writes to `public.llm_usage`. Cap enforcement wired up but set to ∞. |
 | Provisioning API | New `api/` folder, Next.js TypeScript app, deployed to GKE, hostname `api.conceptsos.com`. |
 | API ↔ K8s | Same Next.js app also runs the **reconcile loop** as a background process (watches Supabase `profiles` / `vms`, reconciles StatefulSets + wg peers via K8s API). Runs with a K8s ServiceAccount that has RBAC to create StatefulSets/Services/Secrets in the `users` namespace. |

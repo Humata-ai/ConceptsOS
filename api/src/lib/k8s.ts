@@ -112,14 +112,16 @@ async function ensureStatefulSet(
                 { name: "PORT", value: "3000" },
                 // The pod talks to Anthropic via our reverse proxy,
                 // which injects the org key server-side. The pod
-                // itself holds no Anthropic credential.
+                // itself holds no Anthropic credential — the pi
+                // conceptsos-provider extension (baked into the image)
+                // rewires the built-in anthropic provider to point here
+                // and authenticates with CONCEPTSOS_API_KEY.
                 {
-                  name: "ANTHROPIC_BASE_URL",
+                  name: "CONCEPTSOS_BASE_URL",
                   value: "http://conceptsos-api.conceptsos-system.svc.cluster.local/api/llm",
                 },
-                { name: "ANTHROPIC_API_KEY", value: "proxied" },
                 // The pod's own identity to the LLM proxy. The pi
-                // anthropic-proxy extension forwards this as
+                // conceptsos-provider extension forwards this as
                 // `Authorization: Bearer <key>`.
                 { name: "CONCEPTSOS_API_KEY", value: apiKey },
               ],

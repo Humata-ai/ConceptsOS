@@ -1,15 +1,18 @@
 // Anthropic reverse proxy.
 //
 // Sits at `/api/llm/v1/*` and forwards to `https://api.anthropic.com/v1/*`
-// with the org's ANTHROPIC_API_KEY injected server-side.
+// with the org's Anthropic key injected server-side.
 //
 // Why: user pods must not hold the org key (they're user-controlled
 // userland), and Anthropic doesn't expose a create-api-key endpoint on
 // the Admin API — so per-user native keys aren't possible. Instead the
 // pod treats us as an Anthropic-compatible endpoint. To it:
 //
-//   ANTHROPIC_BASE_URL = http://conceptsos-api.conceptsos-system.svc/api/llm
-//   ANTHROPIC_API_KEY  = <ignored / placeholder>
+//   CONCEPTSOS_BASE_URL = http://conceptsos-api.conceptsos-system.svc/api/llm
+//   CONCEPTSOS_API_KEY  = <per-user key, sent as `Authorization: Bearer ...`>
+//
+// The pi `conceptsos-provider` extension (baked into the pod image) is
+// what rewires the built-in anthropic provider to those env vars.
 //
 // V1 scope: plain passthrough. Per-user auth (source-pod-IP →
 // vms.user_id lookup) and real-time metering (parse SSE usage deltas
