@@ -58,17 +58,8 @@ export function withLogging<C extends Ctx = Ctx>(
     const t0 = Date.now();
     const url = new URL(req.url);
     const meta: LogMeta = {};
-    let status = 0;
-    let err: unknown;
-    try {
-      const res = await handler(req, ctx, meta);
-      status = res.status;
-      return res;
-    } catch (e) {
-      err = e;
-      status = 500;
-      throw e;
-    } finally {
+
+    const emit = (status: number, err?: unknown) => {
       const fields: LogFields = {
         evt: "http",
         route,
@@ -87,6 +78,36 @@ export function withLogging<C extends Ctx = Ctx>(
         ...(err ? { err: String((err as any)?.message ?? err) } : {}),
       };
       console.log(JSON.stringify(fields));
+    };
+
+    let res: Response;
+    try {
+      res = await handler(req, ctx, meta);
+    } catch (e) {
+      emit(500, e);
+      throw e;
     }
+
+    // If the response has a streaming body, defer log emission until the
+    // body is fully drained — that's when the LLM proxy's usage tee has
+    // populated inputTokens/outputTokens on `meta`. Otherwise we'd log
+    // token counts of `undefined` on every streamed request.
+    if (res.body) {
+      const status = res.status;
+      const wrapped = res.body.pipeThrough(
+        new TransformStream<Uint8Array, Uint8Array>({
+          transform(chunk, controller) {
+            controller.enqueue(chunk);
+          },
+          flush() {
+            emit(status);
+          },
+        }),
+      );
+      return new Response(wrapped, { status, statusText: res.statusText, headers: res.headers });
+    }
+
+    emit(res.status);
+    return res;
   };
 }
