@@ -1,9 +1,10 @@
 # ConceptsOS iOS
 
 Native SwiftUI iOS app. Welcome screen → **Sign in with Apple** →
-provisions a per-user ConceptsOS-VM pod on our GKE cluster → user
-imports the WireGuard config into the WireGuard iOS app → the app
-loads their pod inside a WKWebView.
+provisions a per-user ConceptsOS-VM pod on our GKE cluster → the app
+**automatically installs and connects an in-app WireGuard tunnel**
+(no separate WireGuard client needed) → the app loads their pod
+inside a WKWebView.
 
 Deployment target: iOS 16.0. Bundle id: `ai.humata.ConceptsOS`. Ships
 via TestFlight.
@@ -13,10 +14,10 @@ via TestFlight.
 ```
 ContentView.swift picks one of:
 
-  auth.session == nil                  → WelcomeView
-  session, but VM not ready            → ProvisioningView
-  VM ready, tunnel not yet installed   → SetupTunnelView   (QR + copy)
-  VM ready, tunnel installed           → WebAppView         (WKWebView on 10.10.0.1:3000)
+  auth.session == nil                     → WelcomeView
+  session, but VM not ready               → ProvisioningView
+  VM ready, tunnel not up                 → InstallTunnelView  (in-app WG install + connect)
+  VM ready, tunnel connected              → WebAppView         (WKWebView on 10.10.0.1:3000)
 ```
 
 State lives in two `@StateObject`s at the App level:
@@ -44,14 +45,76 @@ iOS/ConceptsOS/ConceptsOS/
 ├── API/
 │   └── ConceptsAPI.swift             POST /api/signup, GET /api/vm
 ├── WireGuard/
-│   └── WireGuardKeys.swift           Curve25519 keypair + Keychain
+│   ├── WireGuardKeys.swift           Curve25519 keypair + Keychain
+│   ├── WGQuickParser.swift           tiny wg-quick → TunnelConfiguration parser (shared with extension)
+│   └── TunnelManager.swift           NETunnelProviderManager wrapper (install + connect)
 ├── Views/
 │   ├── WelcomeView.swift             SignInWithAppleButton
 │   ├── ProvisioningView.swift        polls /api/vm every 2s
-│   ├── SetupTunnelView.swift         QR + config + "I'm connected"
+│   ├── InstallTunnelView.swift       auto-installs the VPN profile,
+│                                     handles the iOS "Allow VPN" prompt,
+│                                     starts the tunnel
 │   └── WebAppView.swift              WKWebView
 └── WebView.swift                     UIViewRepresentable wrapper
+
+iOS/ConceptsOS/ConceptsOSWGTunnel/          # Packet Tunnel Provider extension
+├── PacketTunnelProvider.swift              subclass of NEPacketTunnelProvider,
+│                                           drives WireGuardKit's WireGuardAdapter
+├── Info.plist                              NSExtensionPointIdentifier = com.apple.networkextension.packet-tunnel
+└── ConceptsOSWGTunnel.entitlements         com.apple.developer.networking.networkextension = [packet-tunnel-provider]
 ```
+
+## Baked-in WireGuard
+
+WireGuard runs **inside the app** via a Network Extension
+(`ConceptsOSWGTunnel.appex`) backed by `WireGuardKit` +
+`wireguard-go`. Users no longer install the standalone WireGuard
+iOS app — the first time we have a VM to connect to, iOS shows the
+system `AllowVPN Configuration` prompt and the tunnel comes up
+automatically.
+
+Key pieces:
+
+- **Extension target**: `ConceptsOSWGTunnel`, bundle id
+  `ai.humata.ConceptsOS.WGTunnel`. Ships alongside the main app in
+  `ConceptsOS.app/PlugIns/`.
+- **WireGuardKit** is added as a Swift Package pinned to our fork
+  [`Humata-ai/wireguard-apple`](https://github.com/Humata-ai/wireguard-apple).
+  The fork exists only to (1) bump `swift-tools-version` from 5.3 to
+  5.9 (upstream declares 5.3 but uses `.iOS(.v15)`, which requires
+  5.5+; Xcode 26 refuses to load the manifest as a result) and
+  (2) `#include <sys/types.h>` in `WireGuardKitC.h` so it compiles
+  under Xcode 26's stricter clang modules. All other code is
+  upstream.
+- **`wireguard-go` bridge** is built by a Run Script build phase on
+  the extension target that CDs into the SPM checkout at
+  `…/SourcePackages/checkouts/wireguard-apple/Sources/WireGuardKitGo`
+  and runs `make`. Needs Go on PATH — installed at
+  `/usr/local/go/bin/go` on the Mac Mini.
+- **wg-quick parser**: WireGuardKit's Swift Package doesn't expose
+  its parser, so we ship `WGQuickParser.swift` (~130 lines) shared
+  between the app and the extension.
+- **Entitlements**:
+  - Main app: `com.apple.developer.applesignin`,
+    `com.apple.developer.networking.networkextension = [packet-tunnel-provider]`.
+  - Extension: `com.apple.developer.networking.networkextension = [packet-tunnel-provider]`.
+  - No App Groups needed — the WireGuard config is shipped to the
+    extension via `NETunnelProviderProtocol.providerConfiguration`,
+    which the system persists in the VPN profile.
+- **Apple Developer setup done for this**:
+  - Registered bundle id `ai.humata.ConceptsOS.WGTunnel` (ID
+    `G87FM6S5UF`).
+  - Enabled `NETWORK_EXTENSIONS` capability on both `ai.humata.ConceptsOS`
+    and `ai.humata.ConceptsOS.WGTunnel`.
+  - `-allowProvisioningUpdates` handles the rest per build.
+
+### Rebuilding the pbxproj
+
+The extension target + SPM package + build phases are all created by
+[`iOS/scripts/add-wg-extension.rb`](scripts/add-wg-extension.rb),
+which uses the pure-Ruby `xcodeproj` gem. It's idempotent — rerun
+after checking out an older revision to reapply. The generated
+pbxproj is checked in so day-to-day builds just work.
 
 ## The auth flow (Sign in with Apple, native)
 
@@ -159,10 +222,12 @@ overridable — see the header comments in
 
 ## Local dev (SwiftUI previews only)
 
-You can preview individual views on Mac. Full end-to-end testing needs
-a real device (or simulator) with the WireGuard app installed and the
-config imported. Simulator is fine for the auth + provisioning flow
-since it can reach `api.conceptsos.com` over regular HTTPS.
+You can preview individual views on Mac. Full end-to-end testing
+requires a **physical iOS device** — the iOS Simulator can install a
+VPN profile but doesn't actually route packets through the packet-
+tunnel `utun` interface, so `10.10.0.1:3000` never becomes
+reachable. Use `iOS/scripts/wifi-install.sh` to iterate on a real
+phone.
 
 ## Notes / gotchas
 
