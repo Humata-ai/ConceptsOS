@@ -593,7 +593,7 @@
 			repositoryURL = "https://github.com/Humata-ai/wireguard-apple";
 			requirement = {
 				kind = revision;
-				revision = f47e603240ed3256456cc91f81c14675e0bc29fd;
+				revision = efdf8e0e4084e0b1a0c05155bcb125ed24f190a3;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */

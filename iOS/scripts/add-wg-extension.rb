@@ -45,7 +45,7 @@ TEAM_ID               = "2U53525V55"
 # Pinned to a specific commit for reproducibility. Bump when the
 # upstream project itself needs to move.
 WG_PACKAGE_URL         = "https://github.com/Humata-ai/wireguard-apple"
-WG_PACKAGE_REQUIREMENT = { kind: "revision", revision: "f47e603240ed3256456cc91f81c14675e0bc29fd" }
+WG_PACKAGE_REQUIREMENT = { kind: "revision", revision: "efdf8e0e4084e0b1a0c05155bcb125ed24f190a3" }
 
 app_target = project.targets.find { |t| t.name == APP_TARGET_NAME } or
   abort "no #{APP_TARGET_NAME} target found"
