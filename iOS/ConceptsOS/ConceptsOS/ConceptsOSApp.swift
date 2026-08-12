@@ -31,6 +31,15 @@ struct ConceptsOSApp: App {
             switch screen {
             case "vpnExplainer":
                 VPNExplainerView(onContinue: {})
+            case "webApp":
+                // Debug: point WKWebView at an arbitrary URL, bypassing
+                // the auth+tunnel state machine. Usage:
+                //   xcrun simctl launch booted ai.humata.ConceptsOS \
+                //     -previewScreen webApp -webAppURL http://100.69.188.4:3000
+                let url = (CommandLine.arguments.firstIndex(of: "-webAppURL")
+                    .flatMap { i in i + 1 < CommandLine.arguments.count ? CommandLine.arguments[i + 1] : nil })
+                    ?? "http://100.69.188.4:3000"
+                WebAppView(url: URL(string: url)!)
             default:
                 ContentView()
             }

@@ -144,9 +144,20 @@ async function ensureStatefulSet(
                 periodSeconds: 5,
               },
               volumeMounts: [{ name: "data", mountPath: "/data" }],
+              // vm-dev runs TWO Node dev servers in-pod (CRA on :3000 +
+              // Next.js 15 dev on :3050). Next's initial /chat compile
+              // alone peaks well above 1Gi and easily starves 50m of CPU
+              // shares under GKE, which caused Dan's 2026-08-12 blank-
+              // AI-Agent-iframe repro: /chat sat at `○ Compiling /chat`
+              // forever, readiness on :3000 flapped from CPU thrash, and
+              // the WKWebView iframe just spun on a hung request. The
+              // 3Gi/1000m headroom below is deliberately generous —
+              // dev-server memory in prod (Next standalone) is a fraction
+              // of dev-mode webpack, so once we flip back to the
+              // Dockerfile (non-dev) image the requests naturally shrink.
               resources: {
-                requests: { cpu: "50m", memory: "256Mi" },
-                limits: { cpu: "1", memory: "1Gi" },
+                requests: { cpu: "500m", memory: "1Gi" },
+                limits: { cpu: "2", memory: "3Gi" },
               },
             },
           ],
