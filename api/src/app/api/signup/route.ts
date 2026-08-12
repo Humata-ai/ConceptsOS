@@ -13,6 +13,7 @@ import { z } from "zod";
 import { authUserId, adminClient } from "@/lib/supabase";
 import { allocateClientIp, buildClientConfig, generatePreSharedKey } from "@/lib/wg";
 import { ensureUserApiKey } from "@/lib/apikey";
+import { upsertPeer } from "@/lib/gateway";
 import { env } from "@/lib/env";
 import { withLogging } from "@/lib/log";
 
@@ -43,6 +44,59 @@ export const POST = withLogging("signup", async (req, _ctx, log) => {
     // Backfill: ensure this user has an API key even if they signed up
     // before the api_keys migration landed.
     await ensureUserApiKey(uid);
+
+    // Multi-device support (V1 last-device-wins): if the caller posted
+    // a different WireGuard pubkey than the one currently on file, they
+    // are almost certainly a second device (e.g. Dan's iPad after his
+    // iPhone) that generated its own keypair in its own Keychain. If we
+    // just returned the cached config the caller's private key wouldn't
+    // match any peer on the gateway and the tunnel would silently drop
+    // every packet — cue mysterious black WKWebView on 10.10.0.1:3000.
+    //
+    // So we update wg_pubkey on the row and re-push the peer to the
+    // gateway inline. reconcileOne() won't do this for us because it
+    // only touches rows in status={pending,provisioning,error} and this
+    // user's row is 'ready'.
+    //
+    // Concurrent use of both devices is still not supported in V1 —
+    // whichever device most recently called signup wins the peer slot.
+    // The iOS client re-asserts on every launch so device switching
+    // Just Works, but simultaneous connections will ping-pong.
+    if (existing.wg_pubkey !== body.wgPubkey) {
+      log.extra = {
+        ...(log.extra ?? {}),
+        pubkeyRotated: true,
+        oldPubkeyPrefix: (existing.wg_pubkey ?? "").slice(0, 8),
+        newPubkeyPrefix: body.wgPubkey.slice(0, 8),
+      };
+      const { error: updErr } = await db
+        .from("vms")
+        .update({ wg_pubkey: body.wgPubkey })
+        .eq("user_id", uid);
+      if (updErr) {
+        return NextResponse.json({ error: "db_write_failed", detail: updErr.message }, { status: 500 });
+      }
+      // Only re-push to the gateway if the pod already has a service
+      // ClusterIP — otherwise reconcile will handle the initial push.
+      if (existing.service_cluster_ip) {
+        try {
+          await upsertPeer({
+            userId: uid,
+            wgPubkey: body.wgPubkey,
+            presharedKey: existing.wg_preshared_key,
+            clientIp: existing.wg_client_ip,
+            podServiceIp: existing.service_cluster_ip,
+            podPort: 3000,
+          });
+        } catch (e: any) {
+          return NextResponse.json(
+            { error: "gateway_upsert_failed", detail: String(e?.message ?? e) },
+            { status: 502 },
+          );
+        }
+      }
+    }
+
     return NextResponse.json(vmResponse(existing));
   }
 

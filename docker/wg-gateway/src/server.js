@@ -200,6 +200,22 @@ const server = http.createServer(async (req, res) => {
       if (prev && (prev.podServiceIp !== body.podServiceIp || prev.clientIp !== body.clientIp)) {
         await removePeerRules(prev);
       }
+      // Multi-device support: if the caller rotated their WireGuard
+      // public key (typical case: Dan opened the iOS app on a second
+      // device — iPad — which generated its own device-local Keychain
+      // key), we need to remove the OLD pubkey from wg0 before adding
+      // the new one. Otherwise both peers linger with overlapping
+      // allowed-ips=<clientIp>/32 and the kernel picks one nondeterm-
+      // inistically for return traffic, so the new device's handshake
+      // succeeds but its return packets get routed to the old peer
+      // (which is offline) → tunnel appears up, no bytes flow, WKWebView
+      // black-screens on 10.10.0.1:3000.
+      //
+      // We keep the DNAT rules in place because clientIp → podServiceIp
+      // hasn't changed.
+      else if (prev && prev.wgPubkey !== body.wgPubkey) {
+        await exec("wg", ["set", "wg0", "peer", prev.wgPubkey, "remove"]).catch(() => {});
+      }
       peers[body.userId] = { ...body };
       savePeers();
       await applyPeer(peers[body.userId]);
