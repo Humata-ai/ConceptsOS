@@ -52,9 +52,8 @@ create table if not exists public.vms (
   wg_server_pubkey    text,               -- gateway pubkey (same for all users)
   wg_endpoint         text,               -- e.g. api.conceptsos.com:51820
   wg_preshared_key    text,               -- one PSK per user, server-generated
-  -- Anthropic per-user key metadata (the actual key value never leaves the
-  -- api service and the pod's k8s Secret — we only store the id for revoke).
-  anthropic_key_id    text,
+  -- (Legacy `anthropic_key_id text` column dropped in 0004; per-user keys
+  -- were replaced by the shared-key LLM reverse proxy.)
   -- Kubernetes bookkeeping.
   pod_name            text,
   pod_namespace       text,

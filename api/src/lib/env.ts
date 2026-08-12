@@ -24,12 +24,9 @@ export const env = {
   supabaseServiceRoleKey: () => required("SUPABASE_SERVICE_ROLE_KEY"),
 
   // --- Anthropic -----------------------------------------------------------
-  // Admin API key used to mint per-user workspace keys. If unset, we fall
-  // back to a single shared Anthropic key (see anthropicSharedKey) — that
-  // mode is called "shared-key mode" throughout the code.
-  anthropicAdminKey: () => optional("ANTHROPIC_ADMIN_KEY"),
+  // Shared org key used by the LLM reverse proxy (`/api/llm/v1/*`).
+  // User pods never see this — they call the proxy, which injects it.
   anthropicSharedKey: () => optional("ANTHROPIC_API_KEY"),
-  anthropicWorkspaceId: () => optional("ANTHROPIC_WORKSPACE_ID"),
 
   // --- WireGuard gateway ---------------------------------------------------
   // These are populated at deploy time from the wg-gateway ConfigMap /

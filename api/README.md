@@ -26,7 +26,7 @@ See `src/lib/env.ts`. Required for prod:
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
 - `WG_SERVER_PUBKEY`, `WG_ENDPOINT` (e.g. `api.conceptsos.com:51820`)
 - `USER_POD_IMAGE`
-- `ANTHROPIC_ADMIN_KEY` (preferred) **or** `ANTHROPIC_API_KEY` (shared fallback)
+- `ANTHROPIC_API_KEY` (org key injected by the `/api/llm/v1/*` reverse proxy)
 - `WG_GATEWAY_URL`, `WG_GATEWAY_TOKEN`
 
 ## Deploy

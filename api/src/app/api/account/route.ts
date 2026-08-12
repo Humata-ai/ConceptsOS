@@ -1,10 +1,9 @@
 // DELETE /api/account
 //
 // Fully wipes a user account:
-//   1. Revoke their Anthropic key (best-effort).
-//   2. Delete their k8s pod / statefulset / service / secret (best-effort).
-//   3. Remove their wg peer from the gateway (best-effort).
-//   4. Delete their auth.users row — which cascades to profiles, vms,
+//   1. Delete their k8s pod / statefulset / service / secret (best-effort).
+//   2. Remove their wg peer from the gateway (best-effort).
+//   3. Delete their auth.users row — which cascades to profiles, vms,
 //      and llm_usage via `on delete cascade`.
 //
 // Auth: normally, only the user themselves (Authorization: Bearer <jwt>).
@@ -17,7 +16,6 @@
 
 import { NextResponse } from "next/server";
 import { adminClient, authUserId } from "@/lib/supabase";
-import { revokeUserKey } from "@/lib/anthropic";
 import { deleteUserPod } from "@/lib/k8s";
 import { removePeer } from "@/lib/gateway";
 import { withLogging } from "@/lib/log";
@@ -49,17 +47,9 @@ export const DELETE = withLogging("account", async (req: Request) => {
   // Look up VM metadata BEFORE we delete anything, so we know what to tear down.
   const { data: vm } = await db
     .from("vms")
-    .select("user_id, anthropic_key_id, pod_name, pod_namespace")
+    .select("user_id, pod_name, pod_namespace")
     .eq("user_id", uid)
     .maybeSingle();
-
-  if (vm?.anthropic_key_id) {
-    try {
-      await revokeUserKey(vm.anthropic_key_id);
-    } catch (e: any) {
-      errors.anthropic = String(e?.message ?? e);
-    }
-  }
 
   if (vm) {
     try {

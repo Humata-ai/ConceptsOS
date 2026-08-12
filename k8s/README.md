@@ -29,13 +29,13 @@ service (see `api/src/lib/k8s.ts`).
 ## Secrets you must create by hand (once)
 
 ```bash
-# api's Supabase creds + Anthropic admin key
+# api's Supabase creds + shared Anthropic org key (used by the
+# /api/llm/v1/* reverse proxy).
 kubectl -n conceptsos-system create secret generic conceptsos-api-secrets \
   --from-literal=SUPABASE_URL=... \
   --from-literal=SUPABASE_ANON_KEY=... \
   --from-literal=SUPABASE_SERVICE_ROLE_KEY=... \
-  --from-literal=ANTHROPIC_ADMIN_KEY=... \
-  --from-literal=ANTHROPIC_WORKSPACE_ID=... \
+  --from-literal=ANTHROPIC_API_KEY=... \
   --from-literal=WG_GATEWAY_TOKEN=$(openssl rand -hex 32) \
   --from-literal=WG_SERVER_PUBKEY=<filled-in-after-gateway-first-boot>
 

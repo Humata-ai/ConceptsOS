@@ -246,9 +246,6 @@ export async function deleteUserPod(userId: string): Promise<void> {
   };
   await swallow404(apps().deleteNamespacedStatefulSet(name, ns));
   await swallow404(core().deleteNamespacedService(name, ns));
-  // Legacy: pre-proxy pods had a per-user Anthropic key Secret. New
-  // pods don't, but keep the delete for cleanup of any older pods.
-  await swallow404(core().deleteNamespacedSecret(`${name}-anthropic`, ns));
   await swallow404(core().deleteNamespacedPersistentVolumeClaim(`data-${name}-0`, ns));
 }
 
