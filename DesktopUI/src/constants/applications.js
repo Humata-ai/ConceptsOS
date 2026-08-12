@@ -31,5 +31,5 @@ export const APP_NAMES = {
 //   IP the client got.
 const isDev = process.env.NODE_ENV === "development";
 export const AI_AGENT_URL = isDev
-  ? `${window.location.protocol}//${window.location.hostname}:3050/chat`
-  : "/chat";
+	? `${window.location.protocol}//${window.location.hostname}:3050/chat`
+	: "/chat";
