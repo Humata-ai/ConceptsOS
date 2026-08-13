@@ -54,7 +54,9 @@
 	   plus the same fixed extra space, so content is never clipped and the
 	   spacing looks uniform whatever the notch / home-indicator size. */
 	--safe-area-inset-bottom-taskbar: calc(var(--safe-area-inset-bottom) + 4px);
-	--safe-area-inset-top-scaled: calc(var(--safe-area-inset-top) + 8px);
+	/* Slightly tighter than the raw notch/Dynamic Island inset. Clamped at 0 so
+	   it never goes negative on devices with no top inset. */
+	--safe-area-inset-top-scaled: max(0px, calc(var(--safe-area-inset-top) - 12px));
 
 	--window-shadow-size: 0.3rem;
 	--window-shadow-opacity: 35%;

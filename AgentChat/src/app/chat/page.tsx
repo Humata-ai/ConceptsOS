@@ -35,6 +35,42 @@ import { StickToBottom } from "use-stick-to-bottom";
 
 const DRAWER_WIDTH = 280;
 
+// Persisted snapshot of an in-flight agent turn. Written (throttled) while a
+// turn streams so that if the tab reloads — e.g. the DesktopUI iframe reloads
+// after an edit — we can restore the partial UI and reconnect to the still-
+// running turn instead of losing it. `state` and `cursor` are always a
+// consistent pair, so a slightly stale snapshot still resumes correctly.
+const LIVE_KEY = "chatui-live";
+type LiveSnapshot = { id: string; cursor: number; state: ChatState };
+function readLive(): LiveSnapshot | null {
+  try {
+    const raw = localStorage.getItem(LIVE_KEY);
+    if (!raw) return null;
+    const v = JSON.parse(raw) as LiveSnapshot;
+    return v && v.id ? v : null;
+  } catch {
+    return null;
+  }
+}
+function writeLive(snap: LiveSnapshot) {
+  try {
+    localStorage.setItem(LIVE_KEY, JSON.stringify(snap));
+  } catch {
+    /* ignore quota / serialization errors */
+  }
+}
+function clearLiveStorage(id?: string) {
+  try {
+    if (id) {
+      const cur = readLive();
+      if (cur && cur.id !== id) return;
+    }
+    localStorage.removeItem(LIVE_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
 // iOS gets slightly different SwipeableDrawer tuning: Safari's back-swipe
 // conflicts with the drawer's "discovery" nudge, and iOS's own drawers
 // don't fade the backdrop separately from the panel.
@@ -46,6 +82,19 @@ const iOS =
 export default function Page() {
   const { mode, toggle } = useContext(ColorModeContext);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // When embedded as an iframe inside the DesktopUI shell, that shell already
+  // insets its window for the notch/home-indicator, so we must NOT add the
+  // safe-area insets again here or the top/bottom padding doubles up. Only
+  // self-inset when we're the top-level document (standalone webview).
+  const [embedded, setEmbedded] = useState(false);
+  useEffect(() => {
+    try {
+      setEmbedded(window.self !== window.top);
+    } catch {
+      // Cross-origin frame access throws — that means we're embedded.
+      setEmbedded(true);
+    }
+  }, []);
   // When the user swipes the drawer open via useGlobalSwipeToOpen, we've
   // already animated the paper to translateX(0) ourselves. We need MUI's
   // Slide to *skip* its own enter animation on this specific state change,
@@ -65,6 +114,13 @@ export default function Page() {
   const [hydratingIds, setHydratingIds] = useState<Set<string>>(new Set());
   const [input, setInput] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  // Server-side event index we've applied per session, used as the resume
+  // cursor when reconnecting to a running turn.
+  const cursorRef = useRef<Record<string, number>>({});
+  // Throttle for writing the live snapshot to localStorage.
+  const liveFlushRef = useRef<{ timer: number | null; pending: LiveSnapshot | null }>(
+    { timer: null, pending: null },
+  );
   // iOS Safari: prevent focus from scrolling the header off-screen and
   // resize the content container as the software keyboard opens/closes.
   const { contentRef } = usePreventIOSContentScroll();
@@ -160,6 +216,27 @@ export default function Page() {
     const last = localStorage.getItem("chatui-active");
     if (last) setActiveId(last);
   }, []);
+
+  // Restore an in-flight turn after a reload (e.g. the DesktopUI iframe
+  // reloaded). We put the partial UI back, block disk-hydration from
+  // clobbering it, and reconnect to the still-running turn so pi's output
+  // keeps streaming instead of appearing interrupted.
+  const didRestoreRef = useRef(false);
+  useEffect(() => {
+    if (didRestoreRef.current) return;
+    didRestoreRef.current = true;
+    const snap = readLive();
+    if (!snap) return;
+    cursorRef.current[snap.id] = snap.cursor;
+    hydratedRef.current.add(snap.id);
+    setChats((prev) => ({
+      ...prev,
+      [snap.id]: { ...snap.state, streaming: true },
+    }));
+    setActiveId((prev) => prev ?? snap.id);
+    void reconnect(snap.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   useEffect(() => {
     if (activeId) localStorage.setItem("chatui-active", activeId);
   }, [activeId]);
@@ -200,6 +277,95 @@ export default function Page() {
     [],
   );
 
+  const persistLive = useCallback((snap: LiveSnapshot) => {
+    const box = liveFlushRef.current;
+    box.pending = snap;
+    if (box.timer != null) return;
+    box.timer = window.setTimeout(() => {
+      box.timer = null;
+      if (box.pending) {
+        writeLive(box.pending);
+        box.pending = null;
+      }
+    }, 150);
+  }, []);
+
+  const stopLive = useCallback((id: string) => {
+    const box = liveFlushRef.current;
+    if (box.timer != null) {
+      window.clearTimeout(box.timer);
+      box.timer = null;
+    }
+    box.pending = null;
+    clearLiveStorage(id);
+  }, []);
+
+  // Open an SSE stream for a session's turn and apply events. Shared by a
+  // fresh send (text provided) and a reconnect after reload (text omitted).
+  const connectStream = useCallback(
+    async (id: string, text: string | undefined) => {
+      const ac = new AbortController();
+      abortRef.current = ac;
+
+      let streamError: string | undefined;
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, text, cursor: cursorRef.current[id] ?? 0 }),
+          signal: ac.signal,
+        });
+        if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+
+        for await (const ev of readSse(res.body)) {
+          const idx = (ev as { _index?: number })._index;
+          if (typeof idx === "number") cursorRef.current[id] = idx + 1;
+          updateActive(id, (c) => {
+            const next = applyChatEvent(c, ev);
+            persistLive({ id, cursor: cursorRef.current[id] ?? 0, state: next });
+            return next;
+          });
+        }
+      } catch (err) {
+        const msg = (err as Error).message;
+        if (msg !== "The user aborted a request.") streamError = msg;
+      } finally {
+        updateActive(id, (c) => endStream(c, streamError));
+        stopLive(id);
+        abortRef.current = null;
+      }
+    },
+    [updateActive, persistLive, stopLive],
+  );
+
+  // After a reload, decide how to rejoin a session that was mid-turn.
+  const reconnect = useCallback(
+    async (id: string) => {
+      try {
+        const res = await fetch(`/api/chat/status?id=${encodeURIComponent(id)}`);
+        const status = (await res.json()) as { active: boolean; cursor: number };
+        if (status.active) {
+          // Turn is still running server-side — resume the live stream.
+          await connectStream(id, undefined);
+        } else {
+          // Turn finished while we were away: drop the stale partial snapshot
+          // and re-hydrate the final result from disk.
+          stopLive(id);
+          cursorRef.current[id] = 0;
+          hydratedRef.current.delete(id);
+          setChats((prev) => {
+            const next = { ...prev };
+            delete next[id];
+            return next;
+          });
+        }
+      } catch (err) {
+        console.error(err);
+      }
+    },
+    [connectStream, stopLive],
+  );
+
   const send = useCallback(async () => {
     const text = input.trim();
     if (!text) return;
@@ -208,7 +374,12 @@ export default function Page() {
     if (!id) return;
     setInput("");
 
-    updateActive(id, (c) => beginStream(c, text));
+    cursorRef.current[id] = 0;
+    updateActive(id, (c) => {
+      const next = beginStream(c, text);
+      persistLive({ id: id!, cursor: 0, state: next });
+      return next;
+    });
 
     // Update session title in sidebar
     setSessions((prev) =>
@@ -219,30 +390,8 @@ export default function Page() {
       ),
     );
 
-    const ac = new AbortController();
-    abortRef.current = ac;
-
-    let streamError: string | undefined;
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, text }),
-        signal: ac.signal,
-      });
-      if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
-
-      for await (const ev of readSse(res.body)) {
-        updateActive(id, (c) => applyChatEvent(c, ev));
-      }
-    } catch (err) {
-      const msg = (err as Error).message;
-      if (msg !== "The user aborted a request.") streamError = msg;
-    } finally {
-      updateActive(id, (c) => endStream(c, streamError));
-      abortRef.current = null;
-    }
-  }, [input, activeId, newChat, updateActive]);
+    await connectStream(id, text);
+  }, [input, activeId, newChat, updateActive, persistLive, connectStream]);
 
   const abort = useCallback(async () => {
     if (!activeId) return;
@@ -369,8 +518,9 @@ export default function Page() {
             bgcolor: "background.default",
             // Clear the iOS status bar in the WKWebView wrapper. The native
             // side sets contentInsetAdjustmentBehavior = .never, so CSS must
-            // add the top safe-area inset itself (b7d6f1b).
-            pt: "env(safe-area-inset-top)",
+            // add the top safe-area inset itself (b7d6f1b) — unless the
+            // DesktopUI shell already did it for our window (embedded).
+            pt: embedded ? 0 : "env(safe-area-inset-top)",
           }}
         >
           <Toolbar variant="dense" sx={{ minHeight: 48 }}>
@@ -451,7 +601,7 @@ export default function Page() {
                 borderTop: (t) => `1px solid ${t.palette.divider}`,
                 px: 1.5,
                 pt: 1.5,
-                pb: "calc(12px + env(safe-area-inset-bottom))",
+                pb: embedded ? "12px" : "calc(12px + env(safe-area-inset-bottom))",
                 flexShrink: 0,
               }}
             >

@@ -24,9 +24,28 @@ type ServerSession = {
   disposed: boolean;
 };
 
+/**
+ * An in-flight (or just-finished) agent turn for a session. The turn is
+ * driven independently of any HTTP request: `session.prompt()` runs to
+ * completion and appends every mapped ChatEvent to `events`, even if no
+ * client is currently streaming. This is what makes a browser reload (which
+ * drops the SSE connection) NOT interrupt pi — the work keeps going and a
+ * reconnecting client can replay `events` from a cursor.
+ */
+type RunState = {
+  /** Append-only log of this turn's events (terminated by a `done`). */
+  events: ChatEvent[];
+  /** True once the turn has fully settled (prompt resolved/aborted). */
+  done: boolean;
+  /** Wake callbacks for streams currently blocked waiting for more events. */
+  waiters: Set<() => void>;
+};
+
 type Store = {
   /** Live in-process cache of hydrated AgentSessions, keyed by session id. */
   live: Map<string, ServerSession>;
+  /** In-flight/last agent turn per session id. */
+  runs: Map<string, RunState>;
   sdk?: PiSdk;
   sdkInit?: Promise<PiSdk>;
   // Shared, provider-configured ModelRuntime. See getModelRuntime().
@@ -39,9 +58,12 @@ type Store = {
 // Survive Next.js dev HMR by pinning to globalThis.
 const g = globalThis as unknown as { __chatuiStore?: Store };
 if (!g.__chatuiStore) {
-  g.__chatuiStore = { live: new Map() };
+  g.__chatuiStore = { live: new Map(), runs: new Map() };
 }
 const store = g.__chatuiStore;
+// Defensive: an older store pinned to globalThis by a previous HMR pass may
+// predate the `runs` map.
+if (!store.runs) store.runs = new Map();
 
 async function loadSdk(): Promise<PiSdk> {
   if (store.sdk) return store.sdk;
@@ -195,6 +217,7 @@ export async function deleteSession(id: string): Promise<boolean> {
     s.disposed = true;
     store.live.delete(id);
   }
+  store.runs.delete(id);
   if (!path) {
     const { SessionManager } = await loadSdk();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -241,24 +264,38 @@ export async function loadUiMessages(id: string): Promise<UiMessage[] | undefine
   return agentMessagesToUi(ctx.messages ?? []);
 }
 
+function wakeAll(run: RunState) {
+  const waiters = [...run.waiters];
+  run.waiters.clear();
+  for (const w of waiters) w();
+}
+
 /**
- * Prompt the agent and stream events. Returns an async iterable of ChatEvent.
+ * Whether a session currently has an in-flight turn, plus how many events
+ * that turn has produced so far (a valid reconnect cursor).
  */
-export async function* streamPrompt(
-  id: string,
-  text: string,
-  signal: AbortSignal,
-): AsyncGenerator<ChatEvent> {
+export function getRunStatus(id: string): { active: boolean; cursor: number } {
+  const run = store.runs.get(id);
+  if (!run) return { active: false, cursor: 0 };
+  return { active: !run.done, cursor: run.events.length };
+}
+
+/**
+ * Start a new agent turn for `id` unless one is already running. The turn is
+ * fire-and-forget: it runs to completion (or until abortSession()) regardless
+ * of whether any HTTP client is streaming it.
+ */
+async function ensureRun(id: string, text: string): Promise<RunState | undefined> {
+  const existing = store.runs.get(id);
+  if (existing && !existing.done) return existing;
+
   const server = await getSession(id);
-  if (!server) {
-    yield { type: "error", message: "Session not found" };
-    return;
-  }
+  if (!server) return undefined;
 
   // Auto-title the session from its first user message if unnamed.
   try {
-    const existing = server.sessionManager.getSessionName?.();
-    if (!existing) {
+    const existingName = server.sessionManager.getSessionName?.();
+    if (!existingName) {
       const title = deriveTitle(text);
       if (title) server.sessionManager.appendSessionInfo(title);
     }
@@ -266,23 +303,15 @@ export async function* streamPrompt(
     /* ignore */
   }
 
-  const queue: ChatEvent[] = [];
-  let resolve: (() => void) | null = null;
-  const wake = () => {
-    if (resolve) {
-      const r = resolve;
-      resolve = null;
-      r();
-    }
-  };
+  const run: RunState = { events: [], done: false, waiters: new Set() };
+  store.runs.set(id, run);
+
   const push = (e: ChatEvent) => {
-    queue.push(e);
-    wake();
+    run.events.push(e);
+    wakeAll(run);
   };
 
-  let done = false;
   const toolBuffers = new Map<string, string>();
-
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const unsubscribe = server.session.subscribe((event: any) => {
     try {
@@ -292,40 +321,71 @@ export async function* streamPrompt(
     }
   });
 
-  const onAbort = () => {
-    server.session.abort().catch(() => {});
-  };
-  signal.addEventListener("abort", onAbort);
-
-  const runPromise = (async () => {
+  // NOTE: deliberately not awaited and NOT tied to any request signal. A
+  // dropped SSE connection (e.g. the DesktopUI iframe reloading) must not
+  // abort this.
+  void (async () => {
     try {
       await server.session.prompt(text);
     } catch (err) {
       push({ type: "error", message: (err as Error).message });
     } finally {
-      done = true;
+      unsubscribe();
+      run.done = true;
       push({ type: "done" });
     }
   })();
 
-  try {
-    while (true) {
-      if (queue.length === 0) {
-        if (done) break;
-        await new Promise<void>((r) => (resolve = r));
-      }
-      while (queue.length > 0) {
-        const ev = queue.shift()!;
-        yield ev;
-        if (ev.type === "done") {
-          await runPromise;
-          return;
-        }
-      }
+  return run;
+}
+
+/**
+ * Stream a session's active turn starting at `cursor`. If no turn is running
+ * and `text` is provided, a new turn is started first.
+ *
+ * `signal` only stops *this* stream (the client went away). It never aborts
+ * the underlying agent turn — use abortSession() for that. This is the crux
+ * of "reloading AgentChat does not interrupt pi".
+ */
+export async function* streamRun(
+  id: string,
+  text: string | undefined,
+  cursor: number,
+  signal: AbortSignal,
+): AsyncGenerator<{ index: number; event: ChatEvent }> {
+  let run = store.runs.get(id);
+  if ((!run || run.done) && text) {
+    run = await ensureRun(id, text);
+  }
+  if (!run) {
+    // Nothing running and nothing to start (e.g. a reconnect that arrived
+    // after the turn already finished). Tell the client to settle.
+    yield { index: cursor, event: { type: "done" } };
+    return;
+  }
+
+  let i = Math.max(0, cursor);
+  while (!signal.aborted) {
+    if (i < run.events.length) {
+      const event = run.events[i];
+      yield { index: i, event };
+      i++;
+      if (event.type === "done") return;
+      continue;
     }
-    await runPromise;
-  } finally {
-    signal.removeEventListener("abort", onAbort);
-    unsubscribe();
+    if (run.done) return;
+    await new Promise<void>((resolve) => {
+      if (signal.aborted) return resolve();
+      const cleanup = () => {
+        run!.waiters.delete(onWake);
+        signal.removeEventListener("abort", onWake);
+      };
+      const onWake = () => {
+        cleanup();
+        resolve();
+      };
+      run!.waiters.add(onWake);
+      signal.addEventListener("abort", onWake);
+    });
   }
 }

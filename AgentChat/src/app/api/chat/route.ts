@@ -1,15 +1,24 @@
-import { streamPrompt } from "@/lib/pi-server";
+import { streamRun } from "@/lib/pi-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
-  const { id, text } = (await req.json()) as { id: string; text: string };
-  if (!id || !text) {
-    return new Response("missing id or text", { status: 400 });
+  const { id, text, cursor } = (await req.json()) as {
+    id: string;
+    // Omitted on a reconnect: just resume streaming an already-running turn.
+    text?: string;
+    // Event index to resume from (0 for a fresh send).
+    cursor?: number;
+  };
+  if (!id) {
+    return new Response("missing id", { status: 400 });
   }
 
   const encoder = new TextEncoder();
+  // This controller only stops *streaming to this client*. It is intentionally
+  // NOT wired to server.session.abort() — a dropped connection (browser reload)
+  // must leave the agent turn running. Explicit stop goes through /api/abort.
   const ac = new AbortController();
   req.signal.addEventListener("abort", () => ac.abort());
 
@@ -21,8 +30,14 @@ export async function POST(req: Request) {
         );
       };
       try {
-        for await (const ev of streamPrompt(id, text, ac.signal)) {
-          write(ev.type, ev);
+        for await (const { index, event } of streamRun(
+          id,
+          text,
+          cursor ?? 0,
+          ac.signal,
+        )) {
+          // `_index` lets the client persist a resume cursor.
+          write(event.type, { ...event, _index: index });
         }
       } catch (err) {
         write("error", { type: "error", message: (err as Error).message });
@@ -31,6 +46,7 @@ export async function POST(req: Request) {
       }
     },
     cancel() {
+      // Client canceled: stop this stream only; the run keeps going.
       ac.abort();
     },
   });

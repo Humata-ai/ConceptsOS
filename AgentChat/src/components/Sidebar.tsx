@@ -102,12 +102,9 @@ function SidebarImpl({
     <Box sx={{ width, display: "flex", flexDirection: "column", height: "100%" }}>
       <Box
         sx={{
-          p: 1.5,
-          // iOS WKWebView: clear the status bar / Dynamic Island. The chat
-          // AppBar already does this (page.tsx), but the sidebar Drawer is
-          // its own stacking context — its header used to render at y=0,
-          // tucking 'My Agent' under the status bar when the drawer opens.
-          pt: "calc(12px + env(safe-area-inset-top))",
+          px: 1.5,
+          pt: 0,
+          pb: 0.5,
           display: "flex",
           alignItems: "center",
           gap: 1,
@@ -148,9 +145,6 @@ function SidebarImpl({
       <Box
         sx={{
           p: 1,
-          // Clear the iOS home-indicator so the theme toggle isn't half
-          // swallowed by the bottom safe-area.
-          pb: "calc(8px + env(safe-area-inset-bottom))",
           display: "flex",
           alignItems: "center",
           gap: 1,

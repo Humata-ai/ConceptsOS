@@ -22,11 +22,21 @@
 
 .Window-container.Maximized .Window-inner {
 	width: 100%;
-	/* Sit below the status bar and above the (safe-area-aware) taskbar. */
-	margin-top: var(--safe-area-inset-top-scaled);
-	height: calc(100% - var(--taskbar-total-height) - var(--safe-area-inset-top-scaled));
+	/* Fill from the very top down to the (safe-area-aware) taskbar. The header
+	   extends up into the top safe area (see below) so the notch/status-bar
+	   region takes the window-bar colour rather than showing the desktop. */
+	margin-top: 0;
+	height: calc(100% - var(--taskbar-total-height));
 	border-radius: 0;
 	resize: none;
+}
+
+.Window-container.Maximized .Header {
+	/* Grow the bar into the top safe area and pad its contents back down, so
+	   the bar's background colour reaches the screen edge but its icons/title
+	   don't sit under the notch/status bar. */
+	height: calc(var(--header-height) + var(--safe-area-inset-top-scaled));
+	padding-top: calc(0.25rem + var(--safe-area-inset-top-scaled));
 }
 
 .Window-inner {
