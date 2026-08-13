@@ -28,8 +28,14 @@
 	left: 0;
 	width: 100%;
 	height: 100%;
+	/* Keep desktop icons clear of the notch/status bar and home-indicator.
+	   max() (not sum) so we don't stack the base padding on top of the inset
+	   — on devices with no inset this is just the normal 0.5rem. */
 	padding: 0.5rem;
-	padding-bottom: calc(var(--taskbar-height) + 0.5rem);
+	padding-top: max(0.5rem, var(--safe-area-inset-top-scaled));
+	padding-left: max(0.5rem, var(--safe-area-inset-left));
+	padding-right: max(0.5rem, var(--safe-area-inset-right));
+	padding-bottom: calc(var(--taskbar-total-height) + 0.5rem);
 	z-index: 1;
 }
 

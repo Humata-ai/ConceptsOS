@@ -39,6 +39,23 @@
 
 	--scrollbar-color: hsla(211, 29%, 40%, 25%);
 
+	/* iOS/notch safe-area insets. The native WKWebView wrapper renders edge-
+	   to-edge (WebAppView .ignoresSafeArea + contentInsetAdjustmentBehavior
+	   .never), so the web app must inset itself. Requires viewport-fit=cover
+	   in index.html for these to resolve to non-zero on iOS. */
+	--safe-area-inset-top: env(safe-area-inset-top, 0px);
+	--safe-area-inset-right: env(safe-area-inset-right, 0px);
+	--safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+	--safe-area-inset-left: env(safe-area-inset-left, 0px);
+
+	/* Add a little breathing room on top of the OS-reported inset. Using an
+	   additive offset (rather than scaling or capping) keeps behaviour
+	   consistent across devices: every device gets its own required safe area
+	   plus the same fixed extra space, so content is never clipped and the
+	   spacing looks uniform whatever the notch / home-indicator size. */
+	--safe-area-inset-bottom-taskbar: calc(var(--safe-area-inset-bottom) + 4px);
+	--safe-area-inset-top-scaled: calc(var(--safe-area-inset-top) + 8px);
+
 	--window-shadow-size: 0.3rem;
 	--window-shadow-opacity: 35%;
 	--window-shadow-spread: 3;
