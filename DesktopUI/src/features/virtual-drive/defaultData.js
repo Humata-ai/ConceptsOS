@@ -70,6 +70,8 @@ export function loadDefaultData(virtualRoot) {
 						folderLink.setLinkedPath(linkedPaths.images);
 					}).createFolderLink("Documents", (folderLink) => {
 						folderLink.setLinkedPath(linkedPaths.documents);
+					}).createFile("My Agent", "", (file) => {
+						file.setIconUrl(AppsManager.getAppIconUrl(APPS.AI_AGENT));
 					});
 				});
 		});

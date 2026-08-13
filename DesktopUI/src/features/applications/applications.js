@@ -22,7 +22,8 @@ export default class AppsManager {
 		new Application("Files", APPS.FILE_EXPLORER, FileExplorer),
 		new Application("AI Agent", APPS.AI_AGENT, WebView, {
 			source: AI_AGENT_URL,
-			size: new Vector2(900, 700)
+			size: new Vector2(900, 700),
+			startMaximized: true
 		}),
 		new Application("Minesweeper", "minesweeper", WebView, {
 			source: "https://prozilla.dev/minesweeper",

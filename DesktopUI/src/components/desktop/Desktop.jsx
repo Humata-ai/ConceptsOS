@@ -131,6 +131,11 @@ export const Desktop = memo(() => {
 				onClickFile={(event, file) => {
 					event.preventDefault();
 
+					if (file.name === "My Agent") {
+						windowsManager.open(APPS.AI_AGENT);
+						return;
+					}
+
 					const options = {};
 					if (file.name === "info.md")
 						options.size = new Vector2(575, 675);

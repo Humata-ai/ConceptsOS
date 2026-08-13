@@ -48,7 +48,7 @@ export const WindowView = memo(({ id, app, size, position, onInteract, options, 
 
 	const [startSize, setStartSize] = useState(size);
 	const [startPosition, setStartPosition] = useState(position);
-	const [maximized, setMaximized] = useState(false);
+	const [maximized, setMaximized] = useState(Boolean(app?.windowOptions?.startMaximized));
 	const [screenWidth, screenHeight] = useScreenDimensions();
 	const [title, setTitle] = useState(app.name);
 	const [iconUrl, setIconUrl] = useState(AppsManager.getAppIconUrl(app.id));
