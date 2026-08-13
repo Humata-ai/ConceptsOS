@@ -103,8 +103,8 @@ function SidebarImpl({
       <Box
         sx={{
           px: 1.5,
-          pt: 0,
-          pb: 0.5,
+          pt: 1,
+          pb: 1,
           display: "flex",
           alignItems: "center",
           gap: 1,
