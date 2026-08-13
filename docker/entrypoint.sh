@@ -15,6 +15,50 @@ log() { echo "[entrypoint $(date -u +%H:%M:%S)] $*" >&2; }
 MODE="${CONCEPTSOS_WG:-external}"
 PORT="${PORT:-3000}"
 
+# ---- Persistent HOME ---------------------------------------------------
+#
+# The pod's PVC is mounted at /data (see api/src/lib/k8s.ts,
+# volumeClaimTemplates "data"). Everything the pi coding agent and the
+# AgentChat user care about lives under $HOME:
+#
+#   ~/.pi/agent/sessions/…    persisted chat history
+#   ~/.pi/agent/extensions/…  user-installed pi extensions
+#   ~/<anything>              files the agent writes with relative paths
+#                             (AgentChat/src/lib/pi-server.ts sets
+#                              cwd = homedir() for every session)
+#   ~/.npm-global/…           user-installed CLI tools (`npm i -g foo`)
+#
+# Point HOME at /data/home so all of the above survives pod restarts.
+# On first boot, seed it from the image's baked /root/ so the pre-
+# installed pi extension (conceptsos-provider.ts) and any future skills
+# we ship in the image are visible to CLI users.
+
+PERSIST_HOME="/data/home"
+SEED_MARKER="$PERSIST_HOME/.conceptsos-seeded"
+
+if [[ -d /data ]]; then
+  if [[ ! -f "$SEED_MARKER" ]]; then
+    log "seeding persistent HOME at $PERSIST_HOME from /root"
+    mkdir -p "$PERSIST_HOME"
+    # -a preserves perms/symlinks; dotfiles included via /root/. trailing dot.
+    cp -a /root/. "$PERSIST_HOME/" 2>/dev/null || true
+    date -u +%FT%TZ > "$SEED_MARKER"
+  else
+    log "persistent HOME already seeded ($PERSIST_HOME)"
+  fi
+  export HOME="$PERSIST_HOME"
+  cd "$HOME"
+
+  # npm's global prefix — so `npm i -g foo` persists too. Prepending to
+  # PATH lets user-installed CLIs shadow baked-in ones if they want.
+  export NPM_CONFIG_PREFIX="$HOME/.npm-global"
+  mkdir -p "$NPM_CONFIG_PREFIX/bin"
+  export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
+else
+  log "WARNING: /data is not mounted — HOME will be ephemeral (/root)"
+  log "         user files and pi sessions will NOT survive pod restart"
+fi
+
 case "$MODE" in
   external)
     log "wg mode: external (no in-container VPN)"

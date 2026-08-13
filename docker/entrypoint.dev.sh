@@ -26,6 +26,28 @@ REPO=/workspace/ConceptsOS
 DESKTOP_PORT="${DESKTOP_PORT:-3000}"
 AGENT_PORT="${AGENT_PORT:-3050}"
 
+# ---- Persistent HOME (see docker/entrypoint.sh for the long comment) --
+# Keep this block in sync with the prod entrypoint. Both images share the
+# same /data PVC, so pi sessions, user files, and `npm i -g` installs
+# survive pod restarts regardless of which image is running.
+PERSIST_HOME="/data/home"
+SEED_MARKER="$PERSIST_HOME/.conceptsos-seeded"
+if [[ -d /data ]]; then
+  if [[ ! -f "$SEED_MARKER" ]]; then
+    log "seeding persistent HOME at $PERSIST_HOME from /root"
+    mkdir -p "$PERSIST_HOME"
+    cp -a /root/. "$PERSIST_HOME/" 2>/dev/null || true
+    date -u +%FT%TZ > "$SEED_MARKER"
+  fi
+  export HOME="$PERSIST_HOME"
+  cd "$HOME"
+  export NPM_CONFIG_PREFIX="$HOME/.npm-global"
+  mkdir -p "$NPM_CONFIG_PREFIX/bin"
+  export PATH="$NPM_CONFIG_PREFIX/bin:$PATH"
+else
+  log "WARNING: /data not mounted — HOME will be ephemeral"
+fi
+
 # CRA respects PORT/HOST. BROWSER=none stops it from trying to xdg-open.
 # CI=true also silences the "browser opened" prompt and disables the
 # interactive watcher hint.
