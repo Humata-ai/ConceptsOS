@@ -5,8 +5,10 @@
 - **Transport:** all user ↔ pod traffic over WireGuard. wg private key is
   generated on-device (iOS) and stored in the iOS Keychain; the server
   only ever sees the client pubkey.
-- **Auth:** Supabase JWTs, Sign in with Apple / Google. RLS on all
-  user-scoped tables.
+- **Auth:** Supabase JWTs, Sign in with Apple / Google. Owner-only SELECT
+  policies on `profiles`, `vms`, and `llm_usage`. `api_keys` is server-only;
+  its missing RLS is addressed by migration `0005_api_keys_rls.sql`.
+  See the [incident and pending production rollout](incidents/2026-10-02-api-keys-rls.md).
 - **Isolation:** one Kubernetes pod + PVC per user. Users cannot reach
   each other over the network (wg-gateway routes strictly by pubkey).
 - **LLM keys:** per-user Anthropic key, revocable independently.
