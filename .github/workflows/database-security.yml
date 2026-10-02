@@ -1,0 +1,41 @@
+name: Database security
+
+on:
+  pull_request:
+    paths: ['sql/**', 'bin/test-api-keys-rls.sh', '.github/workflows/database-security.yml']
+  push:
+    branches: [main]
+    paths: ['sql/**', 'bin/test-api-keys-rls.sh', '.github/workflows/database-security.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  api-keys-rls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ['55322:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Create disposable Supabase role fixtures
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -X -w -v ON_ERROR_STOP=1 'postgresql://postgres@127.0.0.1:55322/postgres' <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE ROLE service_role NOLOGIN BYPASSRLS;
+          SQL
+      - name: Test fresh installs, populated upgrades, rollback, and replay
+        run: bash bin/test-api-keys-rls.sh
